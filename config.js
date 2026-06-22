@@ -2,11 +2,14 @@
 // CONFIGURATION FILE - SPAR Dynamics 365
 // ============================================
 
-// Your Render Backend URL (after deploying on Render)
-const API_URL = 'https://spar-etl-receiver.onrender.com';
+// Your Cloudflare URL (exposes your local SQL Server)
+const CLOUDFLARE_URL = 'https://followed-fiber-admission-transmitted.trycloudflare.com';
 
-// Your Cloudflare URL (for local testing)
-const CLOUDFLARE_URL = 'https://mentioned-carolina-pump-inputs.trycloudflare.com';
+// Use Cloudflare URL as the main API URL
+const API_URL = CLOUDFLARE_URL;
+
+// If you want to use Render API instead, uncomment the line below
+// const API_URL = 'https://spar-etl-receiver.onrender.com';
 
 if (typeof window !== 'undefined') {
     window.API_URL = API_URL;
