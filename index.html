@@ -1045,14 +1045,12 @@
     ============================================ -->
     <script>
         // ============================================
-        // CONFIGURATION - Use Cloudflare URL
+        // CONFIGURATION - Read from config.js
         // ============================================
-        // Your Cloudflare URL (exposes your local SQL Server)
-        var CLOUDFLARE_URL = 'https://venues-antivirus-occupied-procurement.trycloudflare.com';
-        var API_URL = CLOUDFLARE_URL;
-        
-        // If you want to use Render instead, uncomment this:
-        // var API_URL = 'https://spar-etl-receiver.onrender.com';
+        // Get the URL from config.js (loaded earlier in the HTML)
+        // If config.js is not loaded, use the default Cloudflare URL
+        var CLOUDFLARE_URL = window.CLOUDFLARE_URL || 'https://venues-antivirus-occupied-procurement.trycloudflare.com';
+        var API_URL = window.API_URL || CLOUDFLARE_URL;
         
         console.log('🌐 Cloudflare URL:', CLOUDFLARE_URL);
         console.log('📡 API URL:', API_URL);
