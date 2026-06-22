@@ -1,6 +1,6 @@
 """
 SPAR ETL Receiver - Render Version with Cloudflare Tunnel
-Connects to your local SQL Server via Cloudflare API
+No pandas/pyodbc required - uses requests only
 """
 from flask import Flask, request, jsonify
 from datetime import datetime, timedelta
@@ -79,7 +79,6 @@ def execute_command_via_cloudflare(query, params=None):
 @app.route('/health', methods=['GET'])
 def health():
     try:
-        # Test connection to Cloudflare
         response = requests.get(f"{CLOUDFLARE_API_URL}/health", timeout=10)
         cloudflare_status = "connected" if response.status_code == 200 else "error"
     except:
@@ -142,7 +141,6 @@ def create_sales_order():
         total = subtotal + tax
         rewards = total * 0.02
         
-        # Insert sales order
         insert_order_query = """
             INSERT INTO sales_orders (
                 order_number, customer_name, customer_email, order_date, order_time,
@@ -165,9 +163,7 @@ def create_sales_order():
         
         order_id = result.get('id', 0)
         
-        # Insert order lines and update stock
         for i, item in enumerate(items):
-            # Get product details
             product_query = """
                 SELECT product_code, product_name, category_name, current_stock
                 FROM products p
@@ -181,7 +177,6 @@ def create_sales_order():
             
             product = product_result[0]
             
-            # Insert order line
             line_query = """
                 INSERT INTO sales_order_lines (
                     order_id, line_number, product_id, product_code, product_name,
@@ -189,19 +184,18 @@ def create_sales_order():
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             line_params = (
-                order_id, i + 1, item['product_id'], product['product_code'], product['product_name'],
-                product['category_name'], item['quantity'], item['unit_price'],
+                order_id, i + 1, item['product_id'], product.get('product_code', ''),
+                product.get('product_name', ''), product.get('category_name', ''),
+                item['quantity'], item['unit_price'],
                 item['quantity'] * item['unit_price']
             )
             execute_command_via_cloudflare(line_query, line_params)
             
-            # Update stock
             update_stock_query = """
                 UPDATE products SET current_stock = current_stock - ? WHERE id = ?
             """
             execute_command_via_cloudflare(update_stock_query, (item['quantity'], item['product_id']))
         
-        # Create invoice
         invoice_number = 'INV-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
         invoice_query = """
             INSERT INTO sales_invoices (
