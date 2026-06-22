@@ -20,7 +20,7 @@ app = Flask(__name__)
 # ============================================
 
 # Your Cloudflare URL that exposes your local SQL Server API
-CLOUDFLARE_API_URL = os.environ.get('CLOUDFLARE_API_URL', 'https://venues-antivirus-occupied-procurement.trycloudflare.com')
+CLOUDFLARE_API_URL = os.environ.get('CLOUDFLARE_API_URL', 'https://cope-visitors-flow-becoming.trycloudflare.com')
 
 # ============================================
 # DATABASE CONNECTION - Via Cloudflare API
