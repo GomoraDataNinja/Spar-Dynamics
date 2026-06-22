@@ -3,7 +3,7 @@
 // ============================================
 
 // Your Cloudflare URL (exposes your local SQL Server)
-const CLOUDFLARE_URL = 'https://followed-fiber-admission-transmitted.trycloudflare.com';
+const CLOUDFLARE_URL = 'https://now-reliable-php-boulevard.trycloudflare.com';
 
 // Use Cloudflare URL as the main API URL
 const API_URL = CLOUDFLARE_URL;
