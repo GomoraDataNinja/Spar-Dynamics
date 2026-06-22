@@ -9,7 +9,7 @@ const CLOUDFLARE_URL = 'https://followed-fiber-admission-transmitted.trycloudfla
 const API_URL = CLOUDFLARE_URL;
 
 // If you want to use Render API instead, uncomment the line below
-const API_URL = 'https://spar-etl-receiver.onrender.com';
+// const API_URL = 'https://spar-etl-receiver.onrender.com';
 
 if (typeof window !== 'undefined') {
     window.API_URL = API_URL;
