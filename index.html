@@ -10,11 +10,6 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- ============================================
-    CONFIGURATION - Load config.js FIRST
-    ============================================ -->
-    <script src="config.js"></script>
-    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: #202124; height: 100vh; overflow: hidden; }
@@ -1040,6 +1035,7 @@
     </div>
 
     <!-- ============================================
+       <!-- ============================================
     TOAST NOTIFICATION
     ============================================ -->
     <div id="toast" class="toast" style="display: none;"></div>
@@ -1049,20 +1045,15 @@
     ============================================ -->
     <script>
         // ============================================
-        // CONFIGURATION - Read from config.js ONLY
+        // CONFIGURATION - Read from config.js
         // ============================================
         // Get the URL from config.js (loaded earlier in the HTML)
-        var API_URL = window.API_URL;
-        var CLOUDFLARE_URL = window.CLOUDFLARE_URL;
+        // If config.js is not loaded, use the default Cloudflare URL
+        var CLOUDFLARE_URL = window.CLOUDFLARE_URL || 'https://venues-antivirus-occupied-procurement.trycloudflare.com';
+        var API_URL = window.API_URL || CLOUDFLARE_URL;
         
-        // If config.js didn't load, show error
-        if (!API_URL) {
-            console.error('❌ config.js not loaded! Check that the file exists and is loaded correctly.');
-            alert('Configuration file not loaded! Please check config.js.');
-        } else {
-            console.log('🌐 Cloudflare URL:', CLOUDFLARE_URL);
-            console.log('📡 API URL:', API_URL);
-        }
+        console.log('🌐 Cloudflare URL:', CLOUDFLARE_URL);
+        console.log('📡 API URL:', API_URL);
 
         // ============================================
         // NETWORK ANIMATION - ONLY ON LOGIN PAGE
