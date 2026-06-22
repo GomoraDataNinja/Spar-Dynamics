@@ -1035,6 +1035,7 @@
     </div>
 
     <!-- ============================================
+       <!-- ============================================
     TOAST NOTIFICATION
     ============================================ -->
     <div id="toast" class="toast" style="display: none;"></div>
@@ -1044,17 +1045,16 @@
     ============================================ -->
     <script>
         // ============================================
-        // CONFIGURATION - Update this for Render deployment
+        // CONFIGURATION - Use Cloudflare URL
         // ============================================
-        // Replace this URL with your Render backend URL when deployed
-        // Example: 'https://your-backend.onrender.com'
-        var API_URL = 'https://spar-etl-receiver.onrender.com';
-        var CLOUDFLARE_URL = API_URL;
+        // Your Cloudflare URL (exposes your local SQL Server)
+        var CLOUDFLARE_URL = 'https://venues-antivirus-occupied-procurement.trycloudflare.com';
+        var API_URL = CLOUDFLARE_URL;
         
-        // If running locally, uncomment this:
-        // var API_URL = 'http://localhost:8000';
-        // var CLOUDFLARE_URL = 'http://localhost:8000';
+        // If you want to use Render instead, uncomment this:
+        // var API_URL = 'https://spar-etl-receiver.onrender.com';
         
+        console.log('🌐 Cloudflare URL:', CLOUDFLARE_URL);
         console.log('📡 API URL:', API_URL);
 
         // ============================================
@@ -2206,7 +2206,7 @@
         console.log('👥 Users:', users.length);
         console.log('📡 API URL:', API_URL);
         console.log('🔑 Default: admin / Admin@123');
-        console.log('🚀 Ready for Render deployment!');
+        console.log('🚀 Ready for deployment with Cloudflare!');
     </script>
 
 </body>

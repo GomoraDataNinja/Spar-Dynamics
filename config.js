@@ -2,13 +2,11 @@
 // CONFIGURATION FILE - SPAR Dynamics 365
 // ============================================
 
-// Your Cloudflare URL - Change this when URL changes
-const CLOUDFLARE_URL = 'http://localhost:8000';
+// Your Render Backend URL (after deploying on Render)
+const API_URL = 'https://spar-etl-receiver.onrender.com';
 
-// For Cloudflare tunnel, use:
+// Your Cloudflare URL (for local testing)
 const CLOUDFLARE_URL = 'https://venues-antivirus-occupied-procurement.trycloudflare.com';
-
-const API_URL = CLOUDFLARE_URL;
 
 if (typeof window !== 'undefined') {
     window.API_URL = API_URL;
