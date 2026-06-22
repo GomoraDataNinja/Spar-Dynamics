@@ -6,7 +6,7 @@
 const API_URL = 'https://spar-etl-receiver.onrender.com';
 
 // Your Cloudflare URL (for local testing)
-const CLOUDFLARE_URL = 'https://ago-cornwall-nano-forget.trycloudflare.com';
+const CLOUDFLARE_URL = 'https://mentioned-carolina-pump-inputs.trycloudflare.com';
 
 if (typeof window !== 'undefined') {
     window.API_URL = API_URL;
