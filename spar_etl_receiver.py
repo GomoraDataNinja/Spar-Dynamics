@@ -20,7 +20,7 @@ app = Flask(__name__)
 # ============================================
 
 # Your Cloudflare URL that exposes your local SQL Server API
-CLOUDFLARE_API_URL = os.environ.get('CLOUDFLARE_API_URL', 'https://cope-visitors-flow-becoming.trycloudflare.com')
+CLOUDFLARE_API_URL = os.environ.get('CLOUDFLARE_API_URL', 'https://distinguished-geography-mlb-hebrew.trycloudflare.com')
 
 # ============================================
 # DATABASE CONNECTION - Via Cloudflare API
@@ -106,19 +106,20 @@ def get_products():
                 p.cost_price,
                 p.current_stock,
                 p.reorder_level,
-                (ISNULL(p.current_stock, 0) - ISNULL(p.reserved_stock, 0)) AS available_stock,
+                p.current_stock AS available_stock,
                 CASE 
-                    WHEN (ISNULL(p.current_stock, 0) - ISNULL(p.reserved_stock, 0)) <= 0 THEN 'out-of-stock'
-                    WHEN (ISNULL(p.current_stock, 0) - ISNULL(p.reserved_stock, 0)) <= p.reorder_level THEN 'low-stock'
+                    WHEN p.current_stock <= 0 THEN 'out-of-stock'
+                    WHEN p.current_stock <= p.reorder_level THEN 'low-stock'
                     ELSE 'in-stock'
                 END AS stock_status,
                 CASE 
-                    WHEN (ISNULL(p.current_stock, 0) - ISNULL(p.reserved_stock, 0)) <= 0 THEN 'Out of Stock'
-                    WHEN (ISNULL(p.current_stock, 0) - ISNULL(p.reserved_stock, 0)) <= p.reorder_level THEN 'Low Stock'
+                    WHEN p.current_stock <= 0 THEN 'Out of Stock'
+                    WHEN p.current_stock <= p.reorder_level THEN 'Low Stock'
                     ELSE 'In Stock'
-                END AS stock_label
-            FROM products p
-            LEFT JOIN product_categories pc ON p.category_id = pc.id
+                END AS stock_label,
+                p.is_active
+            FROM erp_products p
+            LEFT JOIN erp_product_categories pc ON p.category_id = pc.id
             WHERE p.is_active = 1
             ORDER BY pc.category_name, p.product_name
         """
@@ -141,16 +142,37 @@ def create_sales_order():
         total = subtotal + tax
         rewards = total * 0.02
         
+        # Get or create customer
+        customer_query = "SELECT id FROM erp_customers WHERE customer_name = ?"
+        customer_result = execute_query_via_cloudflare(customer_query, [data['customer_name']])
+        
+        if customer_result:
+            customer_id = customer_result[0]['id']
+        else:
+            # Create customer
+            insert_customer = """
+                INSERT INTO erp_customers (customer_code, customer_name, customer_type, email)
+                VALUES (?, ?, ?, ?)
+            """
+            customer_code = 'CUST-' + datetime.now().strftime('%Y%m%d%H%M%S')
+            execute_command_via_cloudflare(
+                insert_customer,
+                [customer_code, data['customer_name'], 'Retail', data.get('customer_email', '')]
+            )
+            # Get the new customer ID
+            customer_result = execute_query_via_cloudflare(customer_query, [data['customer_name']])
+            customer_id = customer_result[0]['id'] if customer_result else None
+        
         insert_order_query = """
-            INSERT INTO sales_orders (
-                order_number, customer_name, customer_email, order_date, order_time,
+            INSERT INTO erp_sales_orders (
+                so_number, customer_id, order_date, order_time,
                 subtotal, tax_amount, total_amount, rewards_earned,
-                status, recorded_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                status, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         
         order_params = (
-            order_number, data['customer_name'], data.get('customer_email', ''),
+            order_number, customer_id,
             datetime.now().strftime('%Y-%m-%d'), datetime.now().strftime('%H:%M:%S'),
             subtotal, tax, total, rewards,
             'Confirmed', data.get('recorded_by', 'system')
@@ -165,10 +187,9 @@ def create_sales_order():
         
         for i, item in enumerate(items):
             product_query = """
-                SELECT product_code, product_name, category_name, current_stock
-                FROM products p
-                LEFT JOIN product_categories pc ON p.category_id = pc.id
-                WHERE p.id = ?
+                SELECT product_code, product_name, current_stock
+                FROM erp_products 
+                WHERE id = ?
             """
             product_result = execute_query_via_cloudflare(product_query, [item['product_id']])
             
@@ -178,36 +199,38 @@ def create_sales_order():
             product = product_result[0]
             
             line_query = """
-                INSERT INTO sales_order_lines (
-                    order_id, line_number, product_id, product_code, product_name,
-                    product_category, quantity, unit_price, line_total
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO erp_sales_order_lines (
+                    so_id, line_number, product_id, product_code, product_name,
+                    quantity, unit_price, line_total
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """
             line_params = (
                 order_id, i + 1, item['product_id'], product.get('product_code', ''),
-                product.get('product_name', ''), product.get('category_name', ''),
+                product.get('product_name', ''),
                 item['quantity'], item['unit_price'],
                 item['quantity'] * item['unit_price']
             )
             execute_command_via_cloudflare(line_query, line_params)
             
             update_stock_query = """
-                UPDATE products SET current_stock = current_stock - ? WHERE id = ?
+                UPDATE erp_products SET current_stock = current_stock - ? WHERE id = ?
             """
             execute_command_via_cloudflare(update_stock_query, (item['quantity'], item['product_id']))
         
         invoice_number = 'INV-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
         invoice_query = """
-            INSERT INTO sales_invoices (
-                invoice_number, order_id, customer_name, customer_email,
-                invoice_date, due_date, subtotal, tax_amount, total_amount,
-                recorded_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO erp_sales_invoices (
+                invoice_number, customer_id, invoice_date, due_date,
+                subtotal, tax_amount, total_amount,
+                created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
         invoice_params = (
-            invoice_number, order_id, data['customer_name'], data.get('customer_email', ''),
-            datetime.now().strftime('%Y-%m-%d'), (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d'),
-            subtotal, tax, total, data.get('recorded_by', 'system')
+            invoice_number, customer_id,
+            datetime.now().strftime('%Y-%m-%d'),
+            (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d'),
+            subtotal, tax, total,
+            data.get('recorded_by', 'system')
         )
         execute_command_via_cloudflare(invoice_query, invoice_params)
         
@@ -228,11 +251,16 @@ def get_sales_orders():
     try:
         query = """
             SELECT 
-                so.order_number, so.customer_name, so.order_date, so.order_time,
-                so.total_amount, so.rewards_earned, so.status,
-                so.recorded_by
-            FROM sales_orders so
-            ORDER BY so.order_date DESC, so.order_time DESC
+                so.so_number as order_number,
+                c.customer_name,
+                so.order_date,
+                so.order_time,
+                so.total_amount,
+                so.status,
+                so.created_by as recorded_by
+            FROM erp_sales_orders so
+            LEFT JOIN erp_customers c ON so.customer_id = c.id
+            ORDER BY so.created_at DESC
         """
         result = execute_query_via_cloudflare(query)
         return jsonify(result), 200
@@ -251,17 +279,38 @@ def create_purchase_order():
         tax = subtotal * 0.155
         total = subtotal + tax
         
+        # Get or create supplier
+        supplier_query = "SELECT id FROM erp_suppliers WHERE supplier_name = ?"
+        supplier_result = execute_query_via_cloudflare(supplier_query, [data['supplier_name']])
+        
+        if supplier_result:
+            supplier_id = supplier_result[0]['id']
+        else:
+            insert_supplier = """
+                INSERT INTO erp_suppliers (supplier_code, supplier_name, email)
+                VALUES (?, ?, ?)
+            """
+            supplier_code = 'SUP-' + datetime.now().strftime('%Y%m%d%H%M%S')
+            execute_command_via_cloudflare(
+                insert_supplier,
+                [supplier_code, data['supplier_name'], data.get('supplier_email', '')]
+            )
+            supplier_result = execute_query_via_cloudflare(supplier_query, [data['supplier_name']])
+            supplier_id = supplier_result[0]['id'] if supplier_result else None
+        
         insert_po_query = """
-            INSERT INTO purchase_orders (
-                po_number, supplier_name, supplier_email, order_date,
+            INSERT INTO erp_purchase_orders (
+                po_number, supplier_id, order_date,
                 expected_delivery_date, subtotal, tax_amount, total_amount,
                 status, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         po_params = (
-            po_number, data['supplier_name'], data.get('supplier_email', ''),
-            datetime.now().strftime('%Y-%m-%d'), data.get('expected_delivery_date'),
-            subtotal, tax, total, 'Draft', data.get('created_by', 'system')
+            po_number, supplier_id,
+            datetime.now().strftime('%Y-%m-%d'),
+            data.get('expected_delivery_date'),
+            subtotal, tax, total,
+            'Draft', data.get('created_by', 'system')
         )
         
         result = execute_command_via_cloudflare(insert_po_query, po_params)
@@ -273,7 +322,7 @@ def create_purchase_order():
         
         for i, item in enumerate(items):
             line_query = """
-                INSERT INTO purchase_order_lines (
+                INSERT INTO erp_purchase_order_lines (
                     po_id, line_number, product_id, product_code, product_name,
                     quantity, unit_price, line_total
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -299,10 +348,16 @@ def create_purchase_order():
 def get_purchase_orders():
     try:
         query = """
-            SELECT po_number, supplier_name, order_date, expected_delivery_date,
-                   status, total_amount
-            FROM purchase_orders 
-            ORDER BY order_date DESC
+            SELECT 
+                po.po_number,
+                s.supplier_name,
+                po.order_date,
+                po.expected_delivery_date,
+                po.status,
+                po.total_amount
+            FROM erp_purchase_orders po
+            LEFT JOIN erp_suppliers s ON po.supplier_id = s.id
+            ORDER BY po.created_at DESC
         """
         result = execute_query_via_cloudflare(query)
         return jsonify(result), 200
@@ -315,13 +370,19 @@ def get_recent_sales():
     try:
         query = """
             SELECT TOP 50
-                order_number as sale_id, customer_name, order_date as sale_date,
-                order_time as sale_time, total_amount as total_sales,
-                rewards_earned, status, recorded_by,
+                so.so_number as sale_id,
+                c.customer_name,
+                so.order_date as sale_date,
+                so.order_time as sale_time,
+                so.total_amount as total_sales,
+                so.rewards_earned,
+                so.status,
+                so.created_by as recorded_by,
                 1 as etl_processed
-            FROM sales_orders 
-            WHERE order_date = CAST(GETDATE() AS DATE)
-            ORDER BY order_date DESC, order_time DESC
+            FROM erp_sales_orders so
+            LEFT JOIN erp_customers c ON so.customer_id = c.id
+            WHERE so.order_date = CAST(GETDATE() AS DATE)
+            ORDER BY so.created_at DESC
         """
         result = execute_query_via_cloudflare(query)
         return jsonify(result), 200
@@ -335,16 +396,34 @@ def webhook():
         data = request.json
         logger.info(f"Received sale from: {data.get('customer_name')}")
         
+        # Get or create customer
+        customer_query = "SELECT id FROM erp_customers WHERE customer_name = ?"
+        customer_result = execute_query_via_cloudflare(customer_query, [data.get('customer_name', 'Webhook Customer')])
+        
+        if customer_result:
+            customer_id = customer_result[0]['id']
+        else:
+            insert_customer = """
+                INSERT INTO erp_customers (customer_code, customer_name, customer_type)
+                VALUES (?, ?, ?)
+            """
+            customer_code = 'WEB-' + datetime.now().strftime('%Y%m%d%H%M%S')
+            execute_command_via_cloudflare(
+                insert_customer,
+                [customer_code, data.get('customer_name', 'Webhook Customer'), 'Retail']
+            )
+            customer_result = execute_query_via_cloudflare(customer_query, [data.get('customer_name', 'Webhook Customer')])
+            customer_id = customer_result[0]['id'] if customer_result else None
+        
         insert_query = """
-            INSERT INTO sales_orders (
-                order_number, customer_name, customer_email, order_date, order_time,
-                total_amount, rewards_earned, status, recorded_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO erp_sales_orders (
+                so_number, customer_id, order_date, order_time,
+                total_amount, rewards_earned, status, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
             data.get('sale_id', 'WEB-' + datetime.now().strftime('%Y%m%d%H%M%S')),
-            data.get('customer_name', 'Webhook Customer'),
-            data.get('customer_email', ''),
+            customer_id,
             data.get('sale_date', datetime.now().strftime('%Y-%m-%d')),
             data.get('sale_time', datetime.now().strftime('%H:%M:%S')),
             data.get('total_sales', 0),
@@ -372,13 +451,19 @@ def get_my_sales():
         
         query = """
             SELECT TOP 50 
-                order_number as sale_id, customer_name, order_date as sale_date,
-                order_time as sale_time, total_amount as total_sales,
-                rewards_earned, status, recorded_by
-            FROM sales_orders 
-            WHERE recorded_by = ?
-            AND order_date = CAST(GETDATE() AS DATE)
-            ORDER BY order_date DESC, order_time DESC
+                so.so_number as sale_id,
+                c.customer_name,
+                so.order_date as sale_date,
+                so.order_time as sale_time,
+                so.total_amount as total_sales,
+                so.rewards_earned,
+                so.status,
+                so.created_by as recorded_by
+            FROM erp_sales_orders so
+            LEFT JOIN erp_customers c ON so.customer_id = c.id
+            WHERE so.created_by = ?
+            AND so.order_date = CAST(GETDATE() AS DATE)
+            ORDER BY so.created_at DESC
         """
         result = execute_query_via_cloudflare(query, [recorded_by])
         return jsonify(result), 200
@@ -395,7 +480,7 @@ def get_sales_stats():
                 SUM(total_amount) as total_revenue,
                 AVG(total_amount) as avg_order_value,
                 SUM(rewards_earned) as total_rewards
-            FROM sales_orders
+            FROM erp_sales_orders
             WHERE order_date = CAST(GETDATE() AS DATE)
         """
         result = execute_query_via_cloudflare(query)
@@ -412,6 +497,82 @@ def get_sales_stats():
         logger.error(f"Error getting sales stats: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/goods-receipt', methods=['POST'])
+def receive_goods():
+    try:
+        data = request.json
+        receipt_number = 'GRN-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
+        
+        # Get PO details
+        po_query = "SELECT id, supplier_id FROM erp_purchase_orders WHERE po_number = ?"
+        po_result = execute_query_via_cloudflare(po_query, [data['po_number']])
+        
+        if not po_result:
+            return jsonify({"error": "Purchase order not found"}), 404
+        
+        po = po_result[0]
+        items = data.get('items', [])
+        total_quantity = sum(item['quantity'] for item in items)
+        total_cost = sum(item['quantity'] * item['unit_cost'] for item in items)
+        
+        # Create goods receipt
+        receipt_query = """
+            INSERT INTO erp_goods_receipts (
+                receipt_number, po_id, supplier_id, receipt_date,
+                total_quantity, total_cost, status, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        receipt_params = (
+            receipt_number, po['id'], po['supplier_id'],
+            datetime.now().strftime('%Y-%m-%d'),
+            total_quantity, total_cost, 'Draft', data.get('created_by', 'system')
+        )
+        result = execute_command_via_cloudflare(receipt_query, receipt_params)
+        
+        if not result.get('success', False):
+            return jsonify({"error": "Failed to create goods receipt"}), 500
+        
+        receipt_id = result.get('id', 0)
+        
+        for i, item in enumerate(items):
+            line_query = """
+                INSERT INTO erp_goods_receipt_lines (
+                    receipt_id, line_number, product_id, product_code, product_name,
+                    quantity, unit_cost, total_cost
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            line_params = (
+                receipt_id, i + 1, item['product_id'], item.get('product_code', ''),
+                item.get('product_name', ''), item['quantity'],
+                item['unit_cost'], item['quantity'] * item['unit_cost']
+            )
+            execute_command_via_cloudflare(line_query, line_params)
+            
+            # Update stock
+            update_stock_query = """
+                UPDATE erp_products SET current_stock = current_stock + ? WHERE id = ?
+            """
+            execute_command_via_cloudflare(update_stock_query, (item['quantity'], item['product_id']))
+        
+        # Update PO status
+        update_po_query = """
+            UPDATE erp_purchase_orders 
+            SET status = 'Partially Received'
+            WHERE id = ?
+        """
+        execute_command_via_cloudflare(update_po_query, [po['id']])
+        
+        return jsonify({
+            "status": "success",
+            "receipt_number": receipt_number,
+            "total_quantity": total_quantity,
+            "total_cost": total_cost
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error receiving goods: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/', methods=['GET'])
 def index():
     return jsonify({
@@ -423,6 +584,7 @@ def index():
             "products": "GET /products",
             "sales_orders": "POST /sales-orders, GET /sales-orders",
             "purchase_orders": "POST /purchase-orders, GET /purchase-orders",
+            "goods-receipt": "POST /goods-receipt",
             "recent": "GET /recent",
             "webhook": "POST /webhook",
             "my_sales": "GET /my-sales?recorded_by=username",
