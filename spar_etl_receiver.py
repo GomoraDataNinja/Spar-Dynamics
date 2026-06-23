@@ -130,6 +130,68 @@ def get_products():
         logger.error(f"Error getting products: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/products/add', methods=['POST'])
+def add_product():
+    """
+    Add a new product to the database
+    """
+    try:
+        data = request.json
+        logger.info(f"Adding product: {data.get('product_name')}")
+        
+        # Get category ID from category name
+        category_query = "SELECT id FROM erp_product_categories WHERE category_name = ?"
+        category_result = execute_query_via_cloudflare(category_query, [data.get('category_name')])
+        
+        if not category_result:
+            return jsonify({"error": f"Category '{data.get('category_name')}' not found"}), 400
+        
+        category_id = category_result[0]['id']
+        
+        # Check if product code already exists
+        check_query = "SELECT id FROM erp_products WHERE product_code = ?"
+        check_result = execute_query_via_cloudflare(check_query, [data['product_code']])
+        
+        if check_result:
+            return jsonify({"error": f"Product code '{data['product_code']}' already exists"}), 400
+        
+        # Insert new product
+        insert_query = """
+            INSERT INTO erp_products (
+                product_code, product_name, category_id, unit_of_measure,
+                unit_price, cost_price, current_stock, reorder_level,
+                is_active, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        params = (
+            data['product_code'],
+            data['product_name'],
+            category_id,
+            data.get('unit_of_measure', 'EA'),
+            float(data.get('unit_price', 0)),
+            float(data.get('cost_price', 0)),
+            int(data.get('initial_stock', 0)),
+            int(data.get('reorder_level', 10)),
+            1,  # is_active
+            data.get('created_by', 'system')
+        )
+        
+        result = execute_command_via_cloudflare(insert_query, params)
+        
+        if result.get('success', False):
+            return jsonify({
+                "status": "success",
+                "message": "Product added successfully",
+                "id": result.get('id')
+            }), 200
+        else:
+            return jsonify({"error": "Failed to add product"}), 500
+            
+    except Exception as e:
+        logger.error(f"Error adding product: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/sales-orders', methods=['POST'])
 def create_sales_order():
     try:
@@ -582,12 +644,13 @@ def index():
         "endpoints": {
             "health": "GET /health",
             "products": "GET /products",
+            "products/add": "POST /products/add",
             "sales_orders": "POST /sales-orders, GET /sales-orders",
             "purchase_orders": "POST /purchase-orders, GET /purchase-orders",
             "goods-receipt": "POST /goods-receipt",
             "recent": "GET /recent",
             "webhook": "POST /webhook",
-            "my_sales": "GET /my-sales?recorded_by=username",
+            "my-sales": "GET /my-sales?recorded_by=username",
             "sales/stats": "GET /sales/stats"
         }
     })
