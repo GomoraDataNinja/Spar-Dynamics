@@ -1096,6 +1096,9 @@
             document.getElementById('soRewards').textContent = rewards.toFixed(0) + ' pts';
         }
 
+        // ============================================
+        // MAIN SUBMIT SALES ORDER - FIXED with Customer Creation
+        // ============================================
         async function submitSalesOrder(event) {
             event.preventDefault();
             if (!currentUser) { showToast('❌ Please login first', 'error'); return; }
@@ -1112,14 +1115,21 @@
 
             if (items.length === 0) { showToast('❌ Please add at least one item', 'error'); return; }
 
+            const customerName = document.getElementById('soCustomerName').value.trim();
+            const customerEmail = document.getElementById('soCustomerEmail').value.trim();
+
+            if (!customerName) { showToast('❌ Please enter a customer name', 'error'); return; }
+
             const orderData = {
-                customer_name: document.getElementById('soCustomerName').value,
-                customer_email: document.getElementById('soCustomerEmail').value || '',
+                customer_name: customerName,
+                customer_email: customerEmail || '',
                 items: items,
                 recorded_by: currentUser.username
             };
 
             try {
+                showToast('⏳ Recording sale...', 'info');
+                
                 // Try sales-orders endpoint first
                 let response = await fetch(API_URL + '/sales-orders', {
                     method: 'POST',
@@ -1127,41 +1137,48 @@
                     body: JSON.stringify(orderData)
                 });
 
-                // If that fails, try webhook endpoint
-                if (!response.ok) {
-                    // Convert to simple sale format
-                    const saleData = {
-                        sale_id: 'SPAR-' + new Date().toISOString().replace(/[-:.]/g, '').slice(0, 14) + Math.random().toString(36).slice(2, 6).toUpperCase(),
-                        customer_name: orderData.customer_name,
-                        customer_email: orderData.customer_email,
-                        product: items.map(i => {
-                            const p = products.find(p => p.id === i.product_id);
-                            return p ? p.product_name : 'Unknown';
-                        }).join(', '),
-                        product_category: items.map(i => {
-                            const p = products.find(p => p.id === i.product_id);
-                            return p ? p.category_name : 'Unknown';
-                        }).join(', '),
-                        quantity: items.reduce((sum, i) => sum + i.quantity, 0),
-                        unit_price: items[0]?.unit_price || 0,
-                        total_sales: items.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0),
-                        rewards_earned: items.reduce((sum, i) => sum + (i.quantity * i.unit_price * 0.02), 0),
-                        sale_date: new Date().toISOString().split('T')[0],
-                        sale_time: new Date().toTimeString().slice(0, 8),
-                        timestamp_utc: new Date().toISOString(),
-                        recorded_by: currentUser.username,
-                        etl_processed: 0
-                    };
-                    
-                    response = await fetch(API_URL + '/webhook', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(saleData)
-                    });
-                }
-
                 if (response.ok) {
                     const result = await response.json();
+                    showToast('✅ Sale recorded! Order: ' + result.order_number + ' | Invoice: ' + result.invoice_number, 'success');
+                    closeModal('salesOrderModal');
+                    document.getElementById('salesOrderForm').reset();
+                    updateSoTotals();
+                    await loadAllData();
+                    loadPage('dashboard');
+                    return;
+                }
+
+                // If that fails, try webhook endpoint
+                const saleData = {
+                    sale_id: 'SPAR-' + new Date().toISOString().replace(/[-:.]/g, '').slice(0, 14) + Math.random().toString(36).slice(2, 6).toUpperCase(),
+                    customer_name: customerName,
+                    customer_email: customerEmail || '',
+                    product: items.map(i => {
+                        const p = products.find(p => p.id === i.product_id);
+                        return p ? p.product_name : 'Unknown';
+                    }).join(', '),
+                    product_category: items.map(i => {
+                        const p = products.find(p => p.id === i.product_id);
+                        return p ? p.category_name : 'Unknown';
+                    }).join(', '),
+                    quantity: items.reduce((sum, i) => sum + i.quantity, 0),
+                    unit_price: items[0]?.unit_price || 0,
+                    total_sales: items.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0),
+                    rewards_earned: items.reduce((sum, i) => sum + (i.quantity * i.unit_price * 0.02), 0),
+                    sale_date: new Date().toISOString().split('T')[0],
+                    sale_time: new Date().toTimeString().slice(0, 8),
+                    timestamp_utc: new Date().toISOString(),
+                    recorded_by: currentUser.username,
+                    etl_processed: 0
+                };
+                
+                response = await fetch(API_URL + '/webhook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(saleData)
+                });
+
+                if (response.ok) {
                     showToast('✅ Sale recorded successfully!', 'success');
                     closeModal('salesOrderModal');
                     document.getElementById('salesOrderForm').reset();
@@ -1173,27 +1190,8 @@
                     showToast('❌ Error: ' + (error.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
-                // Save locally if server is not available
-                showToast('⚠️ Sale saved locally. Server not available.', 'info');
-                const localSale = {
-                    sale_id: 'LOCAL-' + Date.now(),
-                    customer_name: orderData.customer_name,
-                    customer_email: orderData.customer_email,
-                    product: items.map(i => {
-                        const p = products.find(p => p.id === i.product_id);
-                        return p ? p.product_name : 'Unknown';
-                    }).join(', '),
-                    total_sales: items.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0),
-                    sale_date: new Date().toISOString().split('T')[0],
-                    sale_time: new Date().toTimeString().slice(0, 8),
-                    recorded_by: currentUser.username
-                };
-                salesData.push(localSale);
-                updateSalesBadge();
-                closeModal('salesOrderModal');
-                document.getElementById('salesOrderForm').reset();
-                updateSoTotals();
-                loadPage('dashboard');
+                console.error('Sale error:', error);
+                showToast('❌ Error recording sale. Please check console for details.', 'error');
             }
         }
 
