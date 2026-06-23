@@ -10,9 +10,6 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- ✅ CONFIGURATION - Load config.js FIRST -->
-    <script src="config.js"></script>
-    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: #202124; height: 100vh; overflow: hidden; }
@@ -713,17 +710,13 @@
     ============================================ -->
     <script>
         // ============================================
-        // CONFIGURATION - Read from config.js ONLY
+        // CONFIGURATION - Hardcoded for Render
         // ============================================
         var API_URL = 'https://spar-erp-2026.onrender.com';
-        var CLOUDFLARE_URL = window.CLOUDFLARE_URL;
+        var CLOUDFLARE_URL = API_URL;
 
-        if (!API_URL) {
-            console.error('❌ config.js not loaded!');
-            alert('Configuration file not loaded! Please check config.js.');
-        } else {
-            console.log('📡 API URL:', API_URL);
-        }
+        console.log('📡 API URL:', API_URL);
+        console.log('🌐 Cloudflare URL:', CLOUDFLARE_URL);
 
         // ============================================
         // NETWORK ANIMATION - ONLY ON LOGIN PAGE
@@ -1874,7 +1867,7 @@
         console.log('👥 Users:', users.length);
         console.log('📡 API URL:', API_URL);
         console.log('🔑 Default: admin / Admin@123');
-        console.log('🚀 Ready for deployment with Cloudflare!');
+        console.log('🚀 Ready for deployment!');
     </script>
 
 </body>
