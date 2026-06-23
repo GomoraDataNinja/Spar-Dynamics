@@ -2,10 +2,10 @@
 // CONFIGURATION FILE - SPAR Dynamics 365
 // ============================================
 
-// Your Render Backend URL (NEVER changes)
+// Your Render Backend URL
 const API_URL = 'https://spar-erp-2026.onrender.com';
 
-// Keep Cloudflare URL for reference (not used directly)
+// Keep Cloudflare URL for reference
 const CLOUDFLARE_URL = API_URL;
 
 if (typeof window !== 'undefined') {
