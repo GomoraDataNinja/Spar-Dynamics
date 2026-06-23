@@ -1,13 +1,13 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import pyodbc
+import pymssql
 import json
 from datetime import time, datetime, date
 import decimal
 import os
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 
 # ============================================
 # CUSTOM JSON ENCODER - FIXES TIME SERIALIZATION
@@ -36,15 +36,13 @@ def get_db_connection():
     username = os.environ.get('DB_USER', 'your_username')
     password = os.environ.get('DB_PASSWORD', 'your_password')
     
-    connection_string = (
-        f'DRIVER={{ODBC Driver 17 for SQL Server}};'
-        f'SERVER={server};'
-        f'DATABASE={database};'
-        f'UID={username};'
-        f'PWD={password};'
+    return pymssql.connect(
+        server=server,
+        user=username,
+        password=password,
+        database=database,
+        timeout=30
     )
-    
-    return pyodbc.connect(connection_string)
 
 # ============================================
 # ROUTES
@@ -138,7 +136,7 @@ def create_sales_order():
         
         cursor.execute("""
             SELECT id FROM erp_customers 
-            WHERE LTRIM(RTRIM(customer_name)) = LTRIM(RTRIM(?))
+            WHERE LTRIM(RTRIM(customer_name)) = LTRIM(RTRIM(%s))
         """, (customer_name,))
         customer_row = cursor.fetchone()
         
@@ -155,7 +153,7 @@ def create_sales_order():
                     payment_terms,
                     is_active,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, GETDATE())
+                ) VALUES (%s, %s, %s, %s, %s, %s, GETDATE())
             """, (
                 'CUST-' + datetime.now().strftime('%Y%m%d%H%M%S'),
                 customer_name,
@@ -198,7 +196,7 @@ def create_sales_order():
                 payment_status,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, GETDATE(), CAST(? AS TIME), ?, ?, ?, ?, ?, ?, GETDATE(), GETDATE())
+            ) VALUES (%s, %s, GETDATE(), CAST(%s AS TIME), %s, %s, %s, %s, %s, %s, GETDATE(), GETDATE())
         """, (
             so_number,
             customer_id,
@@ -223,7 +221,7 @@ def create_sales_order():
             
             # Get product info
             cursor.execute("""
-                SELECT product_code, product_name FROM erp_products WHERE id = ?
+                SELECT product_code, product_name FROM erp_products WHERE id = %s
             """, (product_id,))
             product = cursor.fetchone()
             
@@ -242,7 +240,7 @@ def create_sales_order():
                     tax_amount,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), GETDATE())
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, GETDATE(), GETDATE())
             """, (
                 order_id,
                 idx + 1,
@@ -259,9 +257,9 @@ def create_sales_order():
             # Update stock
             cursor.execute("""
                 UPDATE erp_products 
-                SET current_stock = current_stock - ?,
-                    available_stock = available_stock - ?
-                WHERE id = ?
+                SET current_stock = current_stock - %s,
+                    available_stock = available_stock - %s
+                WHERE id = %s
             """, (quantity, quantity, product_id))
         
         conn.commit()
@@ -279,7 +277,7 @@ def create_sales_order():
             total_value = 0
             
             for item in sale_data:
-                cursor.execute("SELECT product_name, category_name FROM erp_products WHERE id = ?", (item['product_id'],))
+                cursor.execute("SELECT product_name, category_name FROM erp_products WHERE id = %s", (item['product_id'],))
                 p = cursor.fetchone()
                 if p:
                     product_names.append(p[0])
@@ -303,7 +301,7 @@ def create_sales_order():
                     recorded_by,
                     etl_processed,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), CAST(? AS TIME), GETUTCDATE(), ?, 0, GETDATE())
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, GETDATE(), CAST(%s AS TIME), GETUTCDATE(), %s, 0, GETDATE())
             """, (
                 so_number,
                 customer_name,
@@ -414,7 +412,7 @@ def add_product():
                 is_active,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, GETDATE(), GETDATE())
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 1, GETDATE(), GETDATE())
         """, (
             data['product_code'],
             data['product_name'],
@@ -478,7 +476,9 @@ def create_purchase_order():
         cursor = conn.cursor()
         
         # Generate PO number
-        po_number = f"PO-{datetime.now().strftime('%Y%m%d')}-{str(cursor.execute('SELECT COUNT(*) + 1 FROM purchase_orders').fetchone()[0]).zfill(4)}"
+        cursor.execute("SELECT COUNT(*) + 1 FROM purchase_orders")
+        count = cursor.fetchone()[0]
+        po_number = f"PO-{datetime.now().strftime('%Y%m%d')}-{str(count).zfill(4)}"
         
         # Calculate total
         total = sum(item['quantity'] * item['unit_price'] for item in data.get('items', []))
@@ -498,7 +498,7 @@ def create_purchase_order():
                 status,
                 created_by,
                 created_at
-            ) VALUES (?, ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, GETDATE())
+            ) VALUES (%s, %s, %s, GETDATE(), %s, %s, %s, %s, %s, %s, GETDATE())
         """, (
             po_number,
             data['supplier_name'],
@@ -525,7 +525,7 @@ def create_purchase_order():
                     unit_price,
                     line_total,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, GETDATE())
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, GETDATE())
             """, (
                 po_id,
                 idx + 1,
@@ -611,7 +611,7 @@ def webhook():
                 recorded_by,
                 etl_processed,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, GETDATE())
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, GETDATE())
         """, (
             data.get('sale_id'),
             data.get('customer_name'),
