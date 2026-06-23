@@ -3,7 +3,7 @@
 // ============================================
 
 // Your Cloudflare URL (exposes your local SQL Server)
-const CLOUDFLARE_URL = 'https://cope-visitors-flow-becoming.trycloudflare.com';
+const CLOUDFLARE_URL = 'https://distinguished-geography-mlb-hebrew.trycloudflare.com';
 
 // Use Cloudflare URL as the main API URL
 const API_URL = CLOUDFLARE_URL;
