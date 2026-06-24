@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: spar-erp-2026
+    runtime: python
+    repo: https://github.com/GomoraDataNinja/Spar-Dynamics
+    plan: free
+    envVars:
+      - key: CLOUDFLARE_API_URL
+        sync: false
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn spar_etl_receiver:app
