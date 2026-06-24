@@ -3,16 +3,16 @@ services:
     name: spar-erp-2026
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
     startCommand: gunicorn spar_etl_receiver:app
     envVars:
       - key: CLOUDFLARE_API_URL
         sync: false
 
-  - type: web
+  - type: static
     name: spar-erp-fronted
-    runtime: static
     plan: free
     buildCommand: echo "Static site - no build needed"
-    publishDirectory: .
     staticPublishPath: .
