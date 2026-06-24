@@ -706,14 +706,17 @@
     <div id="toast" class="toast" style="display: none;"></div>
 
     <!-- ============================================
-    JAVASCRIPT
+    JAVASCRIPT - Load config first, then main app
     ============================================ -->
+    <script src="config.js"></script>
     <script>
         // ============================================
-        // CONFIGURATION - Hardcoded for Render
+        // CONFIGURATION - Use from config.js
         // ============================================
-        var API_URL = 'https://spar-erp-2026.onrender.com';
-        var CLOUDFLARE_URL = API_URL;
+        // The API_URL is now loaded from config.js
+        // If config.js didn't load, use fallback
+        var API_URL = window.API_URL || 'https://spar-erp-2026.onrender.com';
+        var CLOUDFLARE_URL = window.CLOUDFLARE_URL || API_URL;
 
         console.log('📡 API URL:', API_URL);
         console.log('🌐 Cloudflare URL:', CLOUDFLARE_URL);
@@ -1745,14 +1748,18 @@
         }
 
         // ============================================
-        // SUBMIT PRODUCT
+        // SUBMIT PRODUCT - FIXED WITH BETTER ERROR HANDLING
         // ============================================
         async function submitProduct(event) {
             event.preventDefault();
-            if (!currentUser || currentUser.role !== 'admin') { showToast('❌ Admin access required', 'error'); return; }
+            if (!currentUser || currentUser.role !== 'admin') { 
+                showToast('❌ Admin access required', 'error'); 
+                return; 
+            }
+            
             const productData = {
-                product_code: document.getElementById('prodCode').value,
-                product_name: document.getElementById('prodName').value,
+                product_code: document.getElementById('prodCode').value.trim(),
+                product_name: document.getElementById('prodName').value.trim(),
                 category_name: document.getElementById('prodCategory').value,
                 unit_of_measure: document.getElementById('prodUOM').value,
                 unit_price: parseFloat(document.getElementById('prodPrice').value) || 0,
@@ -1761,24 +1768,44 @@
                 reorder_level: parseInt(document.getElementById('prodReorder').value) || 10,
                 created_by: currentUser.username
             };
+            
+            // Validate required fields
+            if (!productData.product_code) { showToast('❌ Product Code is required', 'error'); return; }
+            if (!productData.product_name) { showToast('❌ Product Name is required', 'error'); return; }
+            if (!productData.category_name) { showToast('❌ Category is required', 'error'); return; }
+            
+            console.log('📦 Adding product:', productData);
+            
             try {
+                showToast('⏳ Adding product...', 'info');
+                
                 const response = await fetch(API_URL + '/products/add', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(productData)
                 });
+                
                 if (response.ok) {
+                    const result = await response.json();
                     showToast('✅ Product "' + productData.product_name + '" added!', 'success');
                     closeModal('productModal');
                     document.getElementById('productForm').reset();
                     await loadAllData();
                     loadPage('products');
                 } else {
-                    const error = await response.json();
-                    showToast('❌ Error: ' + error.error, 'error');
+                    let errorMsg = 'Server error';
+                    try {
+                        const error = await response.json();
+                        errorMsg = error.error || error.message || 'Unknown error';
+                    } catch (e) {
+                        errorMsg = 'Status ' + response.status + ': ' + response.statusText;
+                    }
+                    showToast('❌ Failed to add product: ' + errorMsg, 'error');
+                    console.error('❌ Product add error:', response.status, errorMsg);
                 }
             } catch (error) {
-                showToast('❌ Cannot connect to server', 'error');
+                console.error('❌ Product add error:', error);
+                showToast('❌ Cannot connect to server. Please check your connection.', 'error');
             }
         }
 
@@ -1805,67 +1832,83 @@
         }
 
         // ============================================
-        // TEST ETL - FIXED VERSION
+        // TEST ETL - FIXED TO SHOW REAL CONNECTION STATUS
         // ============================================
         async function testETL() {
             const status = document.getElementById('etlStatus');
             if (!status) return;
             
-            status.textContent = 'Loading...';
+            status.textContent = '🔄 Testing...';
             status.style.color = '#f39c12';
             
             try {
-                // Try to get sales from the API
-                const response = await fetch(API_URL + '/sales-orders');
-                if (response.ok) {
-                    const data = await response.json();
-                    const count = data.length || 0;
-                    status.textContent = '✅ Connected! ' + count + ' sales received';
-                    status.style.color = '#28a745';
-                    document.getElementById('salesBadge').textContent = count;
-                    document.getElementById('orderBadge').textContent = count;
-                    showToast('✅ ETL Connected! ' + count + ' sales', 'success');
-                    return;
-                }
-                
-                // Fallback: try health endpoint
+                // Test health endpoint
                 const healthResponse = await fetch(API_URL + '/health');
                 if (healthResponse.ok) {
                     const healthData = await healthResponse.json();
-                    const count = healthData.total_received || healthData.count || 0;
-                    status.textContent = '✅ Connected! ' + count + ' sales received';
-                    status.style.color = '#28a745';
-                    document.getElementById('salesBadge').textContent = count;
-                    document.getElementById('orderBadge').textContent = count;
-                    showToast('✅ Connected! ' + count + ' sales', 'success');
+                    
+                    // Check Cloudflare status
+                    if (healthData.cloudflare_status === 'connected') {
+                        status.textContent = '✅ Connected! Cloudflare tunnel is working';
+                        status.style.color = '#28a745';
+                        showToast('✅ ETL Connected! Server is online.', 'success');
+                    } else if (healthData.cloudflare_status === 'disconnected' || healthData.cloudflare_status === 'not_configured') {
+                        status.textContent = '⚠️ Server online but Cloudflare not configured';
+                        status.style.color = '#f39c12';
+                        showToast('⚠️ Server is online, but Cloudflare tunnel is not connected.', 'warning');
+                    } else {
+                        status.textContent = '✅ Server online! (Cloudflare status: ' + (healthData.cloudflare_status || 'unknown') + ')';
+                        status.style.color = '#28a745';
+                        showToast('✅ Server is online!', 'success');
+                    }
+                    
+                    // Try to get products count
+                    try {
+                        const productResponse = await fetch(API_URL + '/products');
+                        if (productResponse.ok) {
+                            const productsData = await productResponse.json();
+                            const count = productsData.length || 0;
+                            status.textContent = '✅ Connected! ' + count + ' products loaded';
+                            document.getElementById('salesBadge').textContent = count;
+                            document.getElementById('orderBadge').textContent = count;
+                        }
+                    } catch (e) {
+                        console.log('Products load test:', e.message);
+                    }
+                    
                     return;
                 }
                 
-                // If all APIs fail, use local data
-                const localCount = salesOrders.length || salesData.length || 0;
-                if (localCount > 0) {
-                    status.textContent = '✅ Connected! ' + localCount + ' sales received (cached)';
+                // If health check fails, try products endpoint
+                const productResponse = await fetch(API_URL + '/products');
+                if (productResponse.ok) {
+                    const productsData = await productResponse.json();
+                    const count = productsData.length || 0;
+                    status.textContent = '✅ Connected! ' + count + ' products loaded';
                     status.style.color = '#28a745';
-                    document.getElementById('salesBadge').textContent = localCount;
-                    document.getElementById('orderBadge').textContent = localCount;
-                    showToast('✅ Using cached data: ' + localCount + ' sales', 'info');
-                } else {
-                    status.textContent = '⚠️ Connected but no sales found';
-                    status.style.color = '#f39c12';
-                    showToast('⚠️ No sales data available', 'info');
+                    document.getElementById('salesBadge').textContent = count;
+                    document.getElementById('orderBadge').textContent = count;
+                    showToast('✅ Connected! ' + count + ' products loaded', 'success');
+                    return;
                 }
+                
+                // If all fails, show error
+                status.textContent = '⚠️ Server responded but no data';
+                status.style.color = '#f39c12';
+                showToast('⚠️ Server connected but no data', 'info');
+                
             } catch (error) {
-                // Final fallback: use local data
-                const localCount = salesOrders.length || salesData.length || 0;
-                if (localCount > 0) {
-                    status.textContent = '✅ Connected! ' + localCount + ' sales received (cached)';
-                    status.style.color = '#28a745';
-                    document.getElementById('salesBadge').textContent = localCount;
-                    document.getElementById('orderBadge').textContent = localCount;
-                } else {
-                    status.textContent = '❌ Cannot connect to server';
+                console.error('❌ ETL Test Error:', error);
+                
+                // Check if it's a network error
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    status.textContent = '❌ Cannot reach server! Check your network.';
                     status.style.color = '#dc3545';
-                    showToast('❌ Cannot connect to ETL!', 'error');
+                    showToast('❌ Cannot connect to server!', 'error');
+                } else {
+                    status.textContent = '❌ Error: ' + error.message;
+                    status.style.color = '#dc3545';
+                    showToast('❌ Error connecting to server: ' + error.message, 'error');
                 }
             }
         }
