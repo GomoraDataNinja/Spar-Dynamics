@@ -419,13 +419,27 @@ def get_purchase_orders():
 def get_purchase_order_lines(po_number):
     """Get lines for a specific purchase order"""
     try:
+        logger.info(f"📋 Fetching lines for PO: {po_number}")
+        
         if not CLOUDFLARE_API_URL:
             sample_lines = [
-                {"product_id": 1, "product_code": "PRD001", "product_name": "Apples", "quantity": 10, "unit_price": 1.50},
-                {"product_id": 2, "product_code": "PRD002", "product_name": "Bananas", "quantity": 20, "unit_price": 0.80}
+                {"product_id": 1, "product_code": "PRD001", "product_name": "Golden Delicious Apples", "quantity": 10, "unit_price": 1.50},
+                {"product_id": 2, "product_code": "PRD002", "product_name": "Fresh Bananas", "quantity": 20, "unit_price": 0.80}
             ]
             return jsonify(sample_lines), 200
         
+        # First, get the PO ID
+        po_id_query = "SELECT id FROM erp_purchase_orders WHERE po_number = ?"
+        po_result = execute_query_via_cloudflare(po_id_query, [po_number])
+        
+        if not po_result:
+            logger.warning(f"⚠️ PO not found: {po_number}")
+            return jsonify([]), 200
+        
+        po_id = po_result[0]['id']
+        logger.info(f"✅ Found PO ID: {po_id}")
+        
+        # Get lines for this PO
         query = """
             SELECT 
                 pol.product_id,
@@ -434,13 +448,15 @@ def get_purchase_order_lines(po_number):
                 pol.quantity,
                 pol.unit_price
             FROM erp_purchase_order_lines pol
-            INNER JOIN erp_purchase_orders po ON pol.po_id = po.id
-            WHERE po.po_number = ?
+            WHERE pol.po_id = ?
         """
-        result = execute_query_via_cloudflare(query, [po_number])
+        result = execute_query_via_cloudflare(query, [po_id])
+        logger.info(f"✅ Found {len(result)} lines for PO {po_number}")
         return jsonify(result if result else []), 200
     except Exception as e:
         logger.error(f"Error getting PO lines: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 # ============================================
@@ -453,6 +469,7 @@ def create_purchase_order():
     try:
         data = request.json
         logger.info(f"📦 Creating purchase order for: {data.get('supplier_name')}")
+        logger.info(f"📦 Items: {data.get('items')}")
         
         po_number = 'PO-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
         
@@ -462,6 +479,7 @@ def create_purchase_order():
         total = subtotal + tax
         
         if not CLOUDFLARE_API_URL:
+            logger.warning("⚠️ Cloudflare not configured, returning mock success")
             return jsonify({
                 "status": "success",
                 "po_number": po_number,
@@ -471,11 +489,13 @@ def create_purchase_order():
         supplier_name = data['supplier_name'].strip()
         supplier_email = data.get('supplier_email', '').strip()
         
+        # Get or create supplier
         supplier_query = "SELECT id FROM erp_suppliers WHERE supplier_name = ?"
         supplier_result = execute_query_via_cloudflare(supplier_query, [supplier_name])
         
         if supplier_result:
             supplier_id = supplier_result[0]['id']
+            logger.info(f"✅ Found existing supplier: {supplier_name} (ID: {supplier_id})")
         else:
             supplier_code = 'SUP-' + datetime.now().strftime('%Y%m%d%H%M%S')
             insert_supplier = """
@@ -487,10 +507,13 @@ def create_purchase_order():
                 [supplier_code, supplier_name, supplier_email]
             )
             if not result.get('success', False):
+                logger.error(f"❌ Failed to create supplier: {result}")
                 return jsonify({"error": "Failed to create supplier"}), 500
             supplier_result = execute_query_via_cloudflare(supplier_query, [supplier_name])
             supplier_id = supplier_result[0]['id'] if supplier_result else None
+            logger.info(f"✅ Created new supplier: {supplier_name} (ID: {supplier_id})")
         
+        # Insert purchase order
         insert_po_query = """
             INSERT INTO erp_purchase_orders (
                 po_number, supplier_id, order_date,
@@ -508,10 +531,13 @@ def create_purchase_order():
         result = execute_command_via_cloudflare(insert_po_query, po_params)
         
         if not result.get('success', False):
+            logger.error(f"❌ Failed to create PO: {result}")
             return jsonify({"error": "Failed to create purchase order"}), 500
         
         po_id = result.get('id', 0)
+        logger.info(f"✅ PO created with ID: {po_id}")
         
+        # Insert order lines
         for i, item in enumerate(items):
             line_query = """
                 INSERT INTO erp_purchase_order_lines (
@@ -524,9 +550,10 @@ def create_purchase_order():
                 item.get('product_name', ''), item['quantity'], 
                 item['unit_price'], item['quantity'] * item['unit_price']
             )
-            execute_command_via_cloudflare(line_query, line_params)
+            line_result = execute_command_via_cloudflare(line_query, line_params)
+            logger.info(f"✅ Line {i+1} inserted: {item.get('product_name')} x {item['quantity']}")
         
-        logger.info(f"✅ Purchase order created: {po_number}")
+        logger.info(f"✅ Purchase order completed: {po_number}")
         
         return jsonify({
             "status": "success",
@@ -541,7 +568,7 @@ def create_purchase_order():
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# GOODS RECEIPT ENDPOINT - POST (FIXED STOCK UPDATE)
+# GOODS RECEIPT ENDPOINT - POST
 # ============================================
 
 @app.route('/goods-receipt', methods=['POST'])
