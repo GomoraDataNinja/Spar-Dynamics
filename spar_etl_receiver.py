@@ -65,6 +65,7 @@ def serve_index():
                 "products/add": "POST /products/add",
                 "sales_orders": "GET /sales-orders, POST /sales-orders",
                 "purchase_orders": "GET /purchase-orders, POST /purchase-orders",
+                "purchase_orders/:po_number/lines": "GET /purchase-orders/<po_number>/lines",
                 "goods_receipt": "POST /goods-receipt",
                 "recent": "GET /recent"
             }
@@ -384,8 +385,8 @@ def get_purchase_orders():
     """Get all purchase orders"""
     try:
         sample_pos = [
-            {"po_number": "PO-20260624-1001", "supplier_name": "Fresh Foods Ltd", "order_date": "2026-06-24", "expected_delivery_date": "2026-07-01", "status": "Draft", "total_amount": 500.00},
-            {"po_number": "PO-20260624-1002", "supplier_name": "Meat Suppliers Inc", "order_date": "2026-06-24", "expected_delivery_date": "2026-06-30", "status": "Received", "total_amount": 750.00}
+            {"po_number": "PO-20260624-1001", "supplier_name": "Fresh Foods Ltd", "order_date": "2026-06-24", "expected_delivery_date": "2026-07-01", "status": "Draft", "total_amount": 500.00, "id": 1},
+            {"po_number": "PO-20260624-1002", "supplier_name": "Meat Suppliers Inc", "order_date": "2026-06-24", "expected_delivery_date": "2026-06-30", "status": "Received", "total_amount": 750.00, "id": 2}
         ]
         
         if not CLOUDFLARE_API_URL:
@@ -393,6 +394,7 @@ def get_purchase_orders():
         
         query = """
             SELECT 
+                po.id,
                 po.po_number,
                 s.supplier_name,
                 po.order_date,
@@ -410,7 +412,39 @@ def get_purchase_orders():
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# PURCHASE ORDERS ENDPOINT - POST (FIXED)
+# PURCHASE ORDER LINES ENDPOINT - GET
+# ============================================
+
+@app.route('/purchase-orders/<po_number>/lines', methods=['GET'])
+def get_purchase_order_lines(po_number):
+    """Get lines for a specific purchase order"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            sample_lines = [
+                {"product_id": 1, "product_code": "PRD001", "product_name": "Apples", "quantity": 10, "unit_price": 1.50},
+                {"product_id": 2, "product_code": "PRD002", "product_name": "Bananas", "quantity": 20, "unit_price": 0.80}
+            ]
+            return jsonify(sample_lines), 200
+        
+        query = """
+            SELECT 
+                pol.product_id,
+                pol.product_code,
+                pol.product_name,
+                pol.quantity,
+                pol.unit_price
+            FROM erp_purchase_order_lines pol
+            INNER JOIN erp_purchase_orders po ON pol.po_id = po.id
+            WHERE po.po_number = ?
+        """
+        result = execute_query_via_cloudflare(query, [po_number])
+        return jsonify(result if result else []), 200
+    except Exception as e:
+        logger.error(f"Error getting PO lines: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# PURCHASE ORDERS ENDPOINT - POST
 # ============================================
 
 @app.route('/purchase-orders', methods=['POST'])
@@ -434,7 +468,6 @@ def create_purchase_order():
                 "total_amount": total
             }), 200
         
-        # Get or create supplier
         supplier_name = data['supplier_name'].strip()
         supplier_email = data.get('supplier_email', '').strip()
         
@@ -458,7 +491,6 @@ def create_purchase_order():
             supplier_result = execute_query_via_cloudflare(supplier_query, [supplier_name])
             supplier_id = supplier_result[0]['id'] if supplier_result else None
         
-        # Insert purchase order
         insert_po_query = """
             INSERT INTO erp_purchase_orders (
                 po_number, supplier_id, order_date,
@@ -480,7 +512,6 @@ def create_purchase_order():
         
         po_id = result.get('id', 0)
         
-        # Insert order lines
         for i, item in enumerate(items):
             line_query = """
                 INSERT INTO erp_purchase_order_lines (
@@ -510,7 +541,7 @@ def create_purchase_order():
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# GOODS RECEIPT ENDPOINT - POST (FIXED)
+# GOODS RECEIPT ENDPOINT - POST (FIXED STOCK UPDATE)
 # ============================================
 
 @app.route('/goods-receipt', methods=['POST'])
@@ -539,6 +570,10 @@ def receive_goods():
         
         po = po_result[0]
         items = data.get('items', [])
+        
+        if not items:
+            return jsonify({"error": "No items to receive"}), 400
+        
         total_quantity = sum(item['quantity'] for item in items)
         total_cost = sum(item['quantity'] * item['unit_cost'] for item in items)
         
@@ -561,7 +596,7 @@ def receive_goods():
         
         receipt_id = result.get('id', 0)
         
-        # Process receipt lines and update stock
+        # Process each item - UPDATE STOCK
         for i, item in enumerate(items):
             # Insert receipt line
             line_query = """
@@ -577,12 +612,14 @@ def receive_goods():
             )
             execute_command_via_cloudflare(line_query, line_params)
             
-            # Update stock - ADD to current_stock
+            # CRITICAL: Update stock - ADD to current_stock
             update_stock_query = """
-                UPDATE erp_products SET current_stock = current_stock + ? WHERE id = ?
+                UPDATE erp_products 
+                SET current_stock = ISNULL(current_stock, 0) + ? 
+                WHERE id = ?
             """
-            execute_command_via_cloudflare(update_stock_query, (item['quantity'], item['product_id']))
-            logger.info(f"📦 Stock updated for product {item['product_id']}: +{item['quantity']}")
+            result_stock = execute_command_via_cloudflare(update_stock_query, (item['quantity'], item['product_id']))
+            logger.info(f"📦 Stock updated for product {item['product_id']}: +{item['quantity']}, Result: {result_stock}")
         
         # Update PO status to Received
         update_po_query = """
@@ -675,6 +712,7 @@ if __name__ == '__main__':
     print("   POST /sales-orders")
     print("   GET  /purchase-orders")
     print("   POST /purchase-orders")
+    print("   GET  /purchase-orders/<po_number>/lines")
     print("   POST /goods-receipt")
     print("   GET  /recent")
     print("=" * 70)
