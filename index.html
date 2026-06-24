@@ -11,7 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
-        /* ... (keep all your existing styles) ... */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: #202124; height: 100vh; overflow: hidden; }
         
@@ -211,14 +210,25 @@
         table td { padding: 0.5rem; border-bottom: 1px solid #f0f2f5; }
         table tr:hover { background: #f8f9fa; }
         
-        @media (max-width: 1200px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } .quick-actions { grid-template-columns: repeat(3, 1fr); } .content-grid { grid-template-columns: 1fr; } }
-        @media (max-width: 768px) { .sidebar { width: 60px; } .sidebar .menu-item span, .sidebar .section-title { display: none; } .sidebar .menu-item { padding: 0.8rem 1.2rem; justify-content: center; } .sidebar .menu-item i { font-size: 1.2rem; } .main-content { margin-left: 60px; } .top-nav .nav-actions .search-box { min-width: 120px; } .metrics-grid { grid-template-columns: 1fr; } .quick-actions { grid-template-columns: repeat(2, 1fr); } .top-nav .user-profile .name, .top-nav .user-profile .role { display: none; } .modal .form-row { grid-template-columns: 1fr; } .item-row { grid-template-columns: 1fr 0.8fr; } .product-grid { grid-template-columns: 1fr; } .filter-bar { flex-direction: column; } .login-box { padding: 2rem; } .page-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; } }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #f0f2f5; }
-        ::-webkit-scrollbar-thumb { background: #c1c7cd; border-radius: 8px; }
-        ::-webkit-scrollbar-thumb:hover { background: #a0a7ae; }
+        /* Auto-refresh indicator */
+        .auto-refresh-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        .auto-refresh-indicator.active { background: #28a745; }
+        .auto-refresh-indicator.inactive { background: #dc3545; }
+        .auto-refresh-indicator.checking { background: #f39c12; }
         
-        /* Debug console styles */
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
         .debug-console {
             background: #1a1a2e;
             color: #00ff41;
@@ -226,7 +236,7 @@
             font-size: 12px;
             padding: 10px;
             border-radius: 8px;
-            max-height: 200px;
+            max-height: 150px;
             overflow-y: auto;
             margin-top: 10px;
             border: 1px solid #333;
@@ -239,6 +249,13 @@
         .debug-console .log-entry.success { color: #44ff44; }
         .debug-console .log-entry.warning { color: #ffaa44; }
         .debug-console .log-entry.info { color: #44aaff; }
+        
+        @media (max-width: 1200px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } .quick-actions { grid-template-columns: repeat(3, 1fr); } .content-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .sidebar { width: 60px; } .sidebar .menu-item span, .sidebar .section-title { display: none; } .sidebar .menu-item { padding: 0.8rem 1.2rem; justify-content: center; } .sidebar .menu-item i { font-size: 1.2rem; } .main-content { margin-left: 60px; } .top-nav .nav-actions .search-box { min-width: 120px; } .metrics-grid { grid-template-columns: 1fr; } .quick-actions { grid-template-columns: repeat(2, 1fr); } .top-nav .user-profile .name, .top-nav .user-profile .role { display: none; } .modal .form-row { grid-template-columns: 1fr; } .item-row { grid-template-columns: 1fr 0.8fr; } .product-grid { grid-template-columns: 1fr; } .filter-bar { flex-direction: column; } .login-box { padding: 2rem; } .page-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; } }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f0f2f5; }
+        ::-webkit-scrollbar-thumb { background: #c1c7cd; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a0a7ae; }
     </style>
 </head>
 <body>
@@ -401,13 +418,18 @@
                 </div>
             </div>
             
-            <!-- ETL Status Bar -->
+            <!-- ETL Status Bar with Auto-Refresh Indicator -->
             <div style="background: white; border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1rem; border: 1px solid #e8eaed; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                 <span style="font-weight: 600;">ETL Status:</span>
                 <span id="etlStatus" style="color: #f39c12;">Checking...</span>
                 <button onclick="testETL()" style="background: #002B5C; color: white; border: none; padding: 0.3rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">Test Connection</button>
                 <span style="font-size: 0.7rem; color: #6B7280; margin-left: auto;">
                     <span id="etlUrlDisplay">Loading...</span>
+                </span>
+                <span style="display: flex; align-items: center; gap: 0.3rem; font-size: 0.7rem; color: #6B7280;">
+                    <span class="auto-refresh-indicator active" id="autoRefreshIndicator"></span>
+                    <span id="autoRefreshLabel">Auto-refresh: ON</span>
+                    <button onclick="toggleAutoRefresh()" style="background: none; border: none; color: #0052A5; cursor: pointer; font-size: 0.7rem; text-decoration: underline;">Toggle</button>
                 </span>
             </div>
             
@@ -448,6 +470,7 @@
             <div class="debug-console" id="debugConsole">
                 <div class="log-entry info">🚀 Debug Console Started...</div>
                 <div class="log-entry info">📡 API URL: <span id="debugApiUrl">Loading...</span></div>
+                <div class="log-entry info">🔄 Auto-refresh enabled every 30 seconds</div>
             </div>
             
             <!-- Footer -->
@@ -741,7 +764,7 @@
     <div id="toast" class="toast" style="display: none;"></div>
 
     <!-- ============================================
-    JAVASCRIPT - COMPLETE WORKING VERSION WITH DEBUGGING
+    JAVASCRIPT - COMPLETE WITH AUTO-REFRESH
     ============================================ -->
     <script>
         // ============================================
@@ -749,6 +772,10 @@
         // ============================================
         var API_URL = 'https://spar-erp-2026.onrender.com';
         var CLOUDFLARE_URL = API_URL;
+        var AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
+        var autoRefreshEnabled = true;
+        var autoRefreshTimer = null;
+        var isRefreshing = false;
 
         console.log('📡 API URL:', API_URL);
 
@@ -763,17 +790,73 @@
             entry.textContent = '[' + new Date().toLocaleTimeString() + '] ' + message;
             console.appendChild(entry);
             console.scrollTop = console.scrollHeight;
-            // Keep last 50 entries
             while (console.children.length > 50) {
                 console.removeChild(console.firstChild);
             }
         }
 
-        // Update debug console with API URL
         document.addEventListener('DOMContentLoaded', function() {
             const urlSpan = document.getElementById('debugApiUrl');
             if (urlSpan) urlSpan.textContent = API_URL;
+            startAutoRefresh();
         });
+
+        // ============================================
+        // AUTO-REFRESH FUNCTIONS
+        // ============================================
+        function startAutoRefresh() {
+            if (autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+                autoRefreshTimer = null;
+            }
+            if (autoRefreshEnabled) {
+                autoRefreshTimer = setInterval(function() {
+                    if (!isRefreshing && currentUser) {
+                        debugLog('🔄 Auto-refresh triggered', 'info');
+                        refreshDataSilent();
+                    }
+                }, AUTO_REFRESH_INTERVAL);
+                updateAutoRefreshUI(true);
+                debugLog('🔄 Auto-refresh enabled (' + AUTO_REFRESH_INTERVAL/1000 + 's interval)', 'info');
+            } else {
+                updateAutoRefreshUI(false);
+                debugLog('⏸️ Auto-refresh disabled', 'warning');
+            }
+        }
+
+        function toggleAutoRefresh() {
+            autoRefreshEnabled = !autoRefreshEnabled;
+            startAutoRefresh();
+            showToast(autoRefreshEnabled ? '🔄 Auto-refresh enabled' : '⏸️ Auto-refresh disabled', 'info');
+        }
+
+        function updateAutoRefreshUI(enabled) {
+            const indicator = document.getElementById('autoRefreshIndicator');
+            const label = document.getElementById('autoRefreshLabel');
+            if (indicator) {
+                indicator.className = 'auto-refresh-indicator ' + (enabled ? 'active' : 'inactive');
+            }
+            if (label) {
+                label.textContent = 'Auto-refresh: ' + (enabled ? 'ON' : 'OFF');
+            }
+        }
+
+        function refreshDataSilent() {
+            isRefreshing = true;
+            loadAllData().then(() => {
+                isRefreshing = false;
+                if (currentPage === 'dashboard') {
+                    // Only update dashboard if we're on it
+                    const container = document.getElementById('contentContainer');
+                    if (container && currentPage === 'dashboard') {
+                        // Re-render dashboard with new data
+                        showDashboard(container);
+                    }
+                }
+            }).catch(() => {
+                isRefreshing = false;
+            });
+        }
 
         // ============================================
         // STATE
@@ -955,6 +1038,7 @@
                 setTimeout(() => {
                     loadAllData();
                     loadPage('dashboard');
+                    startAutoRefresh();
                 }, 500);
                 
                 showToast('✅ Welcome, ' + user.full_name + '!', 'success');
@@ -966,6 +1050,10 @@
 
         function logout() {
             currentUser = null;
+            if (autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+                autoRefreshTimer = null;
+            }
             document.getElementById('mainApp').classList.remove('active');
             document.getElementById('loginScreen').classList.remove('hidden');
             document.getElementById('networkContainer').classList.remove('hidden');
@@ -998,26 +1086,31 @@
                     const data = await response.json();
                     products = data || [];
                     debugLog('✅ Loaded ' + products.length + ' products', 'success');
-                    updateProductMetrics();
-                    renderProducts(products);
+                    if (document.getElementById('productList')) {
+                        renderProducts(products);
+                    }
                     populateProductSelects();
+                    updateProductMetrics();
                     return;
                 }
                 debugLog('⚠️ Products API returned status: ' + response.status, 'warning');
-                // Fallback sample products
                 products = [
                     { id: 1, product_code: 'PRD001', product_name: 'Golden Delicious Apples', category_name: 'Fresh Produce', unit_price: 2.99, current_stock: 45, available_stock: 45, reorder_level: 20, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' },
                     { id: 2, product_code: 'PRD002', product_name: 'Fresh Bananas', category_name: 'Fresh Produce', unit_price: 1.49, current_stock: 60, available_stock: 60, reorder_level: 25, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' },
                     { id: 3, product_code: 'PRD003', product_name: 'Beef Steak Rump', category_name: 'Meat & Poultry', unit_price: 12.99, current_stock: 18, available_stock: 18, reorder_level: 15, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' }
                 ];
-                updateProductMetrics();
-                renderProducts(products);
+                if (document.getElementById('productList')) {
+                    renderProducts(products);
+                }
                 populateProductSelects();
+                updateProductMetrics();
             } catch (error) {
                 debugLog('❌ Error loading products: ' + error.message, 'error');
                 products = [];
                 updateProductMetrics();
-                renderProducts([]);
+                if (document.getElementById('productList')) {
+                    renderProducts([]);
+                }
             }
         }
 
@@ -1041,7 +1134,8 @@
                 if (response.ok) {
                     const data = await response.json();
                     salesOrders = data || [];
-                    document.getElementById('orderBadge').textContent = salesOrders.length;
+                    const badge = document.getElementById('orderBadge');
+                    if (badge) badge.textContent = salesOrders.length;
                     debugLog('✅ Loaded ' + salesOrders.length + ' sales orders', 'success');
                     return;
                 }
@@ -1058,7 +1152,10 @@
                 if (response.ok) {
                     const data = await response.json();
                     purchaseOrders = data || [];
-                    document.getElementById('poBadge').textContent = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled').length;
+                    const badge = document.getElementById('poBadge');
+                    if (badge) {
+                        badge.textContent = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled').length;
+                    }
                     debugLog('✅ Loaded ' + purchaseOrders.length + ' purchase orders', 'success');
                     return;
                 }
@@ -1098,8 +1195,10 @@
                 todaySales = todaySales.filter(s => s.recorded_by === currentUser.username);
             }
             const revenue = todaySales.reduce((sum, s) => sum + parseFloat(s.total_sales || 0), 0);
-            document.getElementById('salesBadge').textContent = todaySales.length;
+            const badge = document.getElementById('salesBadge');
+            if (badge) badge.textContent = todaySales.length;
             debugLog('📊 Today\'s sales: ' + todaySales.length + ' transactions, $' + revenue.toFixed(2), 'info');
+            return { count: todaySales.length, revenue: revenue };
         }
 
         // ============================================
@@ -1107,6 +1206,7 @@
         // ============================================
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
+            if (!toast) return;
             toast.textContent = message;
             toast.className = 'toast ' + type;
             toast.style.display = 'block';
@@ -1150,6 +1250,7 @@
         // ============================================
         function addSoItem() {
             const container = document.getElementById('soItemsContainer');
+            if (!container) return;
             const div = document.createElement('div');
             div.className = 'item-row';
             div.innerHTML = `
@@ -1174,7 +1275,8 @@
             const select = document.getElementById('soProductId_' + index);
             const product = products.find(p => p.id == select.value);
             if (product) {
-                document.getElementById('soPrice_' + index).value = product.unit_price;
+                const priceInput = document.getElementById('soPrice_' + index);
+                if (priceInput) priceInput.value = product.unit_price;
                 updateSoTotals();
             }
         }
@@ -1182,17 +1284,25 @@
         function updateSoTotals() {
             let subtotal = 0;
             document.querySelectorAll('[id^="soProductId_"]').forEach((el, i) => {
-                const qty = parseFloat(document.getElementById('soQty_' + i)?.value || 0);
-                const price = parseFloat(document.getElementById('soPrice_' + i)?.value || 0);
-                subtotal += qty * price;
+                const qtyInput = document.getElementById('soQty_' + i);
+                const priceInput = document.getElementById('soPrice_' + i);
+                if (qtyInput && priceInput) {
+                    const qty = parseFloat(qtyInput.value || 0);
+                    const price = parseFloat(priceInput.value || 0);
+                    subtotal += qty * price;
+                }
             });
             const tax = subtotal * 0.155;
             const total = subtotal + tax;
             const rewards = total * 0.02;
-            document.getElementById('soSubtotal').textContent = formatCurrency(subtotal);
-            document.getElementById('soTax').textContent = formatCurrency(tax);
-            document.getElementById('soTotal').textContent = formatCurrency(total);
-            document.getElementById('soRewards').textContent = rewards.toFixed(0) + ' pts';
+            const subTotalEl = document.getElementById('soSubtotal');
+            const taxEl = document.getElementById('soTax');
+            const totalEl = document.getElementById('soTotal');
+            const rewardsEl = document.getElementById('soRewards');
+            if (subTotalEl) subTotalEl.textContent = formatCurrency(subtotal);
+            if (taxEl) taxEl.textContent = formatCurrency(tax);
+            if (totalEl) totalEl.textContent = formatCurrency(total);
+            if (rewardsEl) rewardsEl.textContent = rewards.toFixed(0) + ' pts';
         }
 
         async function submitSalesOrder(event) {
@@ -1206,10 +1316,14 @@
             const items = [];
             document.querySelectorAll('[id^="soProductId_"]').forEach((el, i) => {
                 const productId = el.value;
-                const qty = parseFloat(document.getElementById('soQty_' + i)?.value || 0);
-                const price = parseFloat(document.getElementById('soPrice_' + i)?.value || 0);
-                if (productId && qty > 0 && price > 0) {
-                    items.push({ product_id: parseInt(productId), quantity: qty, unit_price: price });
+                const qtyInput = document.getElementById('soQty_' + i);
+                const priceInput = document.getElementById('soPrice_' + i);
+                if (qtyInput && priceInput) {
+                    const qty = parseFloat(qtyInput.value || 0);
+                    const price = parseFloat(priceInput.value || 0);
+                    if (productId && qty > 0 && price > 0) {
+                        items.push({ product_id: parseInt(productId), quantity: qty, unit_price: price });
+                    }
                 }
             });
 
@@ -1254,7 +1368,11 @@
                     document.getElementById('salesOrderForm').reset();
                     updateSoTotals();
                     await loadAllData();
-                    loadPage('dashboard');
+                    // Force dashboard refresh
+                    if (currentPage === 'dashboard') {
+                        const container = document.getElementById('contentContainer');
+                        if (container) showDashboard(container);
+                    }
                     return;
                 } else {
                     const error = await response.json();
@@ -1272,6 +1390,7 @@
         // ============================================
         function addPoItem() {
             const container = document.getElementById('poItemsContainer');
+            if (!container) return;
             const div = document.createElement('div');
             div.className = 'item-row';
             div.innerHTML = `
@@ -1295,14 +1414,21 @@
         function updatePoTotals() {
             let subtotal = 0;
             document.querySelectorAll('[id^="poProductId_"]').forEach((el, i) => {
-                const qty = parseFloat(document.getElementById('poQty_' + i)?.value || 0);
-                const price = parseFloat(document.getElementById('poPrice_' + i)?.value || 0);
-                subtotal += qty * price;
+                const qtyInput = document.getElementById('poQty_' + i);
+                const priceInput = document.getElementById('poPrice_' + i);
+                if (qtyInput && priceInput) {
+                    const qty = parseFloat(qtyInput.value || 0);
+                    const price = parseFloat(priceInput.value || 0);
+                    subtotal += qty * price;
+                }
             });
             const tax = subtotal * 0.155;
-            document.getElementById('poSubtotal').textContent = formatCurrency(subtotal);
-            document.getElementById('poTax').textContent = formatCurrency(tax);
-            document.getElementById('poTotal').textContent = formatCurrency(subtotal + tax);
+            const subTotalEl = document.getElementById('poSubtotal');
+            const taxEl = document.getElementById('poTax');
+            const totalEl = document.getElementById('poTotal');
+            if (subTotalEl) subTotalEl.textContent = formatCurrency(subtotal);
+            if (taxEl) taxEl.textContent = formatCurrency(tax);
+            if (totalEl) totalEl.textContent = formatCurrency(subtotal + tax);
         }
 
         async function submitPurchaseOrder(event) {
@@ -1312,17 +1438,21 @@
             const items = [];
             document.querySelectorAll('[id^="poProductId_"]').forEach((el, i) => {
                 const productId = el.value;
-                const qty = parseFloat(document.getElementById('poQty_' + i)?.value || 0);
-                const price = parseFloat(document.getElementById('poPrice_' + i)?.value || 0);
-                if (productId && qty > 0 && price > 0) {
-                    const product = products.find(p => p.id == productId);
-                    items.push({
-                        product_id: parseInt(productId),
-                        product_code: product?.product_code || '',
-                        product_name: product?.product_name || '',
-                        quantity: qty,
-                        unit_price: price
-                    });
+                const qtyInput = document.getElementById('poQty_' + i);
+                const priceInput = document.getElementById('poPrice_' + i);
+                if (qtyInput && priceInput) {
+                    const qty = parseFloat(qtyInput.value || 0);
+                    const price = parseFloat(priceInput.value || 0);
+                    if (productId && qty > 0 && price > 0) {
+                        const product = products.find(p => p.id == productId);
+                        items.push({
+                            product_id: parseInt(productId),
+                            product_code: product?.product_code || '',
+                            product_name: product?.product_name || '',
+                            quantity: qty,
+                            unit_price: price
+                        });
+                    }
                 }
             });
 
@@ -1468,11 +1598,18 @@
         }
 
         function updateProductMetrics() {
+            const totalProductsEl = document.getElementById('totalProducts');
+            const inStockEl = document.getElementById('inStockCount');
+            const lowStockEl = document.getElementById('lowStockCount');
+            const outOfStockEl = document.getElementById('outOfStockCount');
+            const productBadgeEl = document.getElementById('productBadge');
+            
             if (!products || products.length === 0) {
-                ['totalProducts','inStockCount','lowStockCount','outOfStockCount'].forEach(id => {
-                    const el = document.getElementById(id); if (el) el.textContent = '0';
-                });
-                if (document.getElementById('productBadge')) document.getElementById('productBadge').textContent = '0';
+                if (totalProductsEl) totalProductsEl.textContent = '0';
+                if (inStockEl) inStockEl.textContent = '0';
+                if (lowStockEl) lowStockEl.textContent = '0';
+                if (outOfStockEl) outOfStockEl.textContent = '0';
+                if (productBadgeEl) productBadgeEl.textContent = '0';
                 return;
             }
             const total = products.length;
@@ -1484,11 +1621,11 @@
                 else if (status === 'low-stock') lowStock++;
                 else outOfStock++;
             });
-            document.getElementById('totalProducts').textContent = total;
-            document.getElementById('inStockCount').textContent = inStock;
-            document.getElementById('lowStockCount').textContent = lowStock;
-            document.getElementById('outOfStockCount').textContent = outOfStock;
-            document.getElementById('productBadge').textContent = lowStock + outOfStock;
+            if (totalProductsEl) totalProductsEl.textContent = total;
+            if (inStockEl) inStockEl.textContent = inStock;
+            if (lowStockEl) lowStockEl.textContent = lowStock;
+            if (outOfStockEl) outOfStockEl.textContent = outOfStock;
+            if (productBadgeEl) productBadgeEl.textContent = lowStock + outOfStock;
         }
 
         // ============================================
@@ -1505,27 +1642,64 @@
             const active = document.querySelector(`.menu-item[data-page="${page}"]`);
             if (active) active.classList.add('active');
 
-            actions.innerHTML = `
-                <button class="btn btn-success" onclick="openModal('salesOrderModal')">
-                    <i class="fas fa-plus"></i> New Sale
-                </button>
-                <button class="btn btn-primary" onclick="openModal('productModal')">
-                    <i class="fas fa-box"></i> Add Product
-                </button>
-                <button class="btn btn-outline" onclick="refreshData()">
-                    <i class="fas fa-sync"></i> Refresh
-                </button>
-            `;
+            if (actions) {
+                actions.innerHTML = `
+                    <button class="btn btn-success" onclick="openModal('salesOrderModal')">
+                        <i class="fas fa-plus"></i> New Sale
+                    </button>
+                    <button class="btn btn-primary" onclick="openModal('productModal')">
+                        <i class="fas fa-box"></i> Add Product
+                    </button>
+                    <button class="btn btn-outline" onclick="refreshData()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                `;
+            }
 
             switch(page) {
-                case 'dashboard': title.textContent = '📊 Role Center'; subtitle.textContent = getGreeting() + '! Here\'s your business overview.'; showDashboard(container); break;
-                case 'sales_orders': title.textContent = '📋 Sales Orders'; subtitle.textContent = 'View all sales orders and invoices.'; showSalesOrders(container); break;
-                case 'my_sales': title.textContent = '👤 My Sales'; subtitle.textContent = 'View your recorded sales.'; showMySales(container); break;
-                case 'products': title.textContent = '📦 Product Management'; subtitle.textContent = 'Manage your product catalog.'; showProducts(container); break;
-                case 'purchase_orders': title.textContent = '📦 Purchase Orders'; subtitle.textContent = 'Manage purchase orders.'; showPurchaseOrders(container); break;
-                case 'goods_receipt': title.textContent = '📥 Goods Receiving'; subtitle.textContent = 'Receive goods from suppliers.'; showGoodsReceipt(container); break;
-                case 'users': title.textContent = '👤 User Management'; subtitle.textContent = 'Manage system users.'; if (currentUser?.role === 'admin') actions.innerHTML += `<button class="btn btn-primary" onclick="openModal('userModal')"><i class="fas fa-user-plus"></i> Add User</button>`; showUsers(container); break;
-                case 'settings': title.textContent = '⚙️ System Settings'; subtitle.textContent = 'View system configuration.'; showSettings(container); break;
+                case 'dashboard': 
+                    if (title) title.textContent = '📊 Role Center'; 
+                    if (subtitle) subtitle.textContent = getGreeting() + '! Here\'s your business overview.'; 
+                    showDashboard(container); 
+                    break;
+                case 'sales_orders': 
+                    if (title) title.textContent = '📋 Sales Orders'; 
+                    if (subtitle) subtitle.textContent = 'View all sales orders and invoices.'; 
+                    showSalesOrders(container); 
+                    break;
+                case 'my_sales': 
+                    if (title) title.textContent = '👤 My Sales'; 
+                    if (subtitle) subtitle.textContent = 'View your recorded sales.'; 
+                    showMySales(container); 
+                    break;
+                case 'products': 
+                    if (title) title.textContent = '📦 Product Management'; 
+                    if (subtitle) subtitle.textContent = 'Manage your product catalog.'; 
+                    showProducts(container); 
+                    break;
+                case 'purchase_orders': 
+                    if (title) title.textContent = '📦 Purchase Orders'; 
+                    if (subtitle) subtitle.textContent = 'Manage purchase orders.'; 
+                    showPurchaseOrders(container); 
+                    break;
+                case 'goods_receipt': 
+                    if (title) title.textContent = '📥 Goods Receiving'; 
+                    if (subtitle) subtitle.textContent = 'Receive goods from suppliers.'; 
+                    showGoodsReceipt(container); 
+                    break;
+                case 'users': 
+                    if (title) title.textContent = '👤 User Management'; 
+                    if (subtitle) subtitle.textContent = 'Manage system users.'; 
+                    if (currentUser?.role === 'admin' && actions) {
+                        actions.innerHTML += `<button class="btn btn-primary" onclick="openModal('userModal')"><i class="fas fa-user-plus"></i> Add User</button>`;
+                    }
+                    showUsers(container); 
+                    break;
+                case 'settings': 
+                    if (title) title.textContent = '⚙️ System Settings'; 
+                    if (subtitle) subtitle.textContent = 'View system configuration.'; 
+                    showSettings(container); 
+                    break;
                 default: showDashboard(container);
             }
         }
@@ -1534,6 +1708,7 @@
         // PAGE: DASHBOARD
         // ============================================
         function showDashboard(container) {
+            if (!container) return;
             const totalProducts = products.length;
             const lowStock = products.filter(p => {
                 const stock = p.available_stock !== undefined ? p.available_stock : p.current_stock;
@@ -1612,6 +1787,7 @@
         // PAGE: SALES ORDERS
         // ============================================
         function showSalesOrders(container) {
+            if (!container) return;
             container.innerHTML = `
                 <div class="card">
                     <div class="card-header"><h3>📋 All Sales Orders</h3><span class="link">Total: ${salesOrders.length} orders</span></div>
@@ -1643,6 +1819,7 @@
         // PAGE: MY SALES
         // ============================================
         function showMySales(container) {
+            if (!container) return;
             const today = new Date().toISOString().split('T')[0];
             let userSales = salesData.filter(s => s.sale_date === today);
             if (currentUser && currentUser.role !== 'admin') userSales = userSales.filter(s => s.recorded_by === currentUser.username);
@@ -1682,6 +1859,7 @@
         // PAGE: PRODUCTS
         // ============================================
         function showProducts(container) {
+            if (!container) return;
             const categories = [...new Set(products.map(p => p.category_name).filter(Boolean))];
             container.innerHTML = `
                 <div class="metrics-grid">
@@ -1711,6 +1889,7 @@
         // PAGE: PURCHASE ORDERS
         // ============================================
         function showPurchaseOrders(container) {
+            if (!container) return;
             container.innerHTML = `
                 <div class="card">
                     <div class="card-header"><h3>📦 Purchase Orders</h3><span class="link">${purchaseOrders.length} total</span></div>
@@ -1742,6 +1921,7 @@
         // PAGE: GOODS RECEIPT
         // ============================================
         function showGoodsReceipt(container) {
+            if (!container) return;
             container.innerHTML = `
                 <div class="card">
                     <div class="card-header"><h3>📥 Goods Receiving</h3>
@@ -1771,6 +1951,7 @@
         // PAGE: USERS
         // ============================================
         function showUsers(container) {
+            if (!container) return;
             if (!currentUser || currentUser.role !== 'admin') {
                 container.innerHTML = '<div class="card"><div class="card-body"><p style="text-align:center;color:#dc3545;padding:1rem 0;">❌ You do not have permission to view this page.</p></div></div>';
                 return;
@@ -1800,6 +1981,7 @@
         // PAGE: SETTINGS
         // ============================================
         function showSettings(container) {
+            if (!container) return;
             if (!currentUser || currentUser.role !== 'admin') {
                 container.innerHTML = '<div class="card"><div class="card-body"><p style="text-align:center;color:#dc3545;padding:1rem 0;">❌ You do not have permission to view this page.</p></div></div>';
                 return;
@@ -1819,11 +2001,17 @@
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Uptime</div><div style="font-weight:600;">${hours}h ${minutes}m</div></div>
                     </div></div></div>
             `;
-            fetch(API_URL + '/health').then(r => r.ok ? '✅ Connected' : '❌ Error').then(s => document.getElementById('settingsETLStatus').textContent = s).catch(() => document.getElementById('settingsETLStatus').textContent = '❌ Not Connected');
+            fetch(API_URL + '/health').then(r => r.ok ? '✅ Connected' : '❌ Error').then(s => {
+                const el = document.getElementById('settingsETLStatus');
+                if (el) el.textContent = s;
+            }).catch(() => {
+                const el = document.getElementById('settingsETLStatus');
+                if (el) el.textContent = '❌ Not Connected';
+            });
         }
 
         // ============================================
-        // SUBMIT PRODUCT - COMPLETE WITH STOCK UPDATE
+        // SUBMIT PRODUCT
         // ============================================
         async function submitProduct(event) {
             event.preventDefault();
@@ -2020,6 +2208,7 @@
         debugLog('🚀 SPAR Dynamics 365 v2.0 Initialized', 'success');
         debugLog('📡 API URL: ' + API_URL, 'info');
         debugLog('🔑 Default: admin / Admin@123', 'info');
+        debugLog('🔄 Auto-refresh enabled every 30 seconds', 'info');
         
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
         console.log('📡 API URL:', API_URL);
