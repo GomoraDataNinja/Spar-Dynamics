@@ -10,9 +10,3 @@ services:
     envVars:
       - key: CLOUDFLARE_API_URL
         sync: false
-
-  - type: static
-    name: spar-erp-fronted
-    plan: free
-    buildCommand: echo "Static site - no build needed"
-    staticPublishPath: .
