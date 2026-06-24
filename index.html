@@ -334,6 +334,9 @@
                     <i class="fas fa-boxes"></i><span>Products</span>
                     <span class="badge warning" id="productBadge">0</span>
                 </a>
+                <a class="menu-item" onclick="openModal('productModal')" data-page="add_product">
+                    <i class="fas fa-plus-circle"></i><span>Add Product</span>
+                </a>
             </div>
             
             <div class="menu-section" id="adminMenu">
@@ -365,6 +368,9 @@
                 <div class="actions" id="pageActions">
                     <button class="btn btn-success" onclick="openModal('salesOrderModal')">
                         <i class="fas fa-plus"></i> New Sale
+                    </button>
+                    <button class="btn btn-primary" onclick="openModal('productModal')">
+                        <i class="fas fa-box"></i> Add Product
                     </button>
                     <button class="btn btn-outline" onclick="refreshData()">
                         <i class="fas fa-sync"></i> Refresh
@@ -400,13 +406,13 @@
                     <i class="fas fa-boxes"></i>
                     <span class="label">Products</span>
                 </div>
+                <div class="quick-action" onclick="openModal('productModal')">
+                    <i class="fas fa-plus-circle"></i>
+                    <span class="label">Add Product</span>
+                </div>
                 <div class="quick-action" onclick="loadPage('my_sales')">
                     <i class="fas fa-user-tie"></i>
                     <span class="label">My Sales</span>
-                </div>
-                <div class="quick-action" onclick="loadPage('users')">
-                    <i class="fas fa-users-cog"></i>
-                    <span class="label">Users</span>
                 </div>
             </div>
             
@@ -424,9 +430,281 @@
     </div>
 
     <!-- ============================================
-    MODALS - Keep all your existing modals here
+    MODAL: New Sale
     ============================================ -->
-    <!-- (Keep all your existing modal HTML here - they are unchanged) -->
+    <div class="modal-overlay" id="salesOrderModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🛒 New Sale</h2>
+                <button class="close-btn" onclick="closeModal('salesOrderModal')">×</button>
+            </div>
+            
+            <form id="salesOrderForm" onsubmit="submitSalesOrder(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Customer Name *</label>
+                        <input type="text" id="soCustomerName" placeholder="Enter customer name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Customer Email</label>
+                        <input type="email" id="soCustomerEmail" placeholder="customer@example.com">
+                    </div>
+                </div>
+                
+                <div style="margin: 1rem 0; padding: 0.5rem; background: #f8f9fa; border-radius: 8px;">
+                    <h4 style="font-size: 0.85rem; color: #002B5C; margin-bottom: 0.5rem;">Order Items</h4>
+                    <div id="soItemsContainer">
+                        <div class="item-row">
+                            <select id="soProductId_0" onchange="updateSoProductInfo(0)" style="padding:0.4rem 0.5rem;border:1px solid #dadce0;border-radius:6px;font-size:0.8rem;">
+                                <option value="">Select Product</option>
+                            </select>
+                            <input type="number" id="soQty_0" value="1" min="1" onchange="updateSoTotals()">
+                            <input type="number" id="soPrice_0" value="0.00" min="0.01" step="0.01" onchange="updateSoTotals()">
+                            <button type="button" class="remove-btn" onclick="this.parentElement.remove(); updateSoTotals();">×</button>
+                        </div>
+                    </div>
+                    <button type="button" class="add-item-btn" onclick="addSoItem()">
+                        <i class="fas fa-plus"></i> Add Item
+                    </button>
+                </div>
+                
+                <div class="order-summary">
+                    <div class="row"><span>Subtotal:</span><span id="soSubtotal">$0.00</span></div>
+                    <div class="row" style="font-size:0.85rem;color:#6B7280;"><span>VAT (15.5%):</span><span id="soTax">$0.00</span></div>
+                    <div class="row total"><span>Total:</span><span id="soTotal">$0.00</span></div>
+                    <div class="row" style="font-size:0.8rem;color:#6B7280;"><span>⭐ Rewards (2%):</span><span id="soRewards">0 pts</span></div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('salesOrderModal')">Cancel</button>
+                    <button type="submit" class="btn btn-success">💾 Record Sale</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================
+    MODAL: New Purchase Order
+    ============================================ -->
+    <div class="modal-overlay" id="poModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>📦 New Purchase Order</h2>
+                <button class="close-btn" onclick="closeModal('poModal')">×</button>
+            </div>
+            
+            <form id="poForm" onsubmit="submitPurchaseOrder(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Supplier Name *</label>
+                        <input type="text" id="poSupplierName" placeholder="Supplier name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Supplier Email</label>
+                        <input type="email" id="poSupplierEmail" placeholder="supplier@example.com">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Expected Delivery Date</label>
+                    <input type="date" id="poExpectedDate">
+                </div>
+                
+                <div style="margin: 1rem 0; padding: 0.5rem; background: #f8f9fa; border-radius: 8px;">
+                    <h4 style="font-size: 0.85rem; color: #002B5C; margin-bottom: 0.5rem;">Order Items</h4>
+                    <div id="poItemsContainer">
+                        <div class="item-row">
+                            <select id="poProductId_0" style="padding:0.4rem 0.5rem;border:1px solid #dadce0;border-radius:6px;font-size:0.8rem;">
+                                <option value="">Select Product</option>
+                            </select>
+                            <input type="number" id="poQty_0" value="1" min="1" onchange="updatePoTotals()">
+                            <input type="number" id="poPrice_0" value="0.00" min="0.01" step="0.01" onchange="updatePoTotals()">
+                            <button type="button" class="remove-btn" onclick="this.parentElement.remove(); updatePoTotals();">×</button>
+                        </div>
+                    </div>
+                    <button type="button" class="add-item-btn" onclick="addPoItem()">
+                        <i class="fas fa-plus"></i> Add Item
+                    </button>
+                </div>
+                
+                <div class="order-summary">
+                    <div class="row"><span>Subtotal:</span><span id="poSubtotal">$0.00</span></div>
+                    <div class="row" style="font-size:0.85rem;color:#6B7280;"><span>VAT (15.5%):</span><span id="poTax">$0.00</span></div>
+                    <div class="row total"><span>Total:</span><span id="poTotal">$0.00</span></div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('poModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">📦 Create PO</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================
+    MODAL: Receive Goods
+    ============================================ -->
+    <div class="modal-overlay" id="goodsReceiptModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>📥 Receive Goods</h2>
+                <button class="close-btn" onclick="closeModal('goodsReceiptModal')">×</button>
+            </div>
+            
+            <form id="goodsReceiptForm" onsubmit="submitGoodsReceipt(event)">
+                <div class="form-group">
+                    <label>Purchase Order</label>
+                    <select id="grPoSelect" required>
+                        <option value="">Select PO</option>
+                    </select>
+                </div>
+                
+                <div id="grItemsContainer"></div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('goodsReceiptModal')">Cancel</button>
+                    <button type="submit" class="btn btn-success">📥 Receive Goods</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================
+    MODAL: Add Product
+    ============================================ -->
+    <div class="modal-overlay" id="productModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>📦 Add New Product</h2>
+                <button class="close-btn" onclick="closeModal('productModal')">×</button>
+            </div>
+            
+            <form id="productForm" onsubmit="submitProduct(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Product Code *</label>
+                        <input type="text" id="prodCode" placeholder="e.g., PRD001" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Product Name *</label>
+                        <input type="text" id="prodName" placeholder="Product name" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category *</label>
+                        <select id="prodCategory" required>
+                            <option value="">Select Category</option>
+                            <option value="Fresh Produce">Fresh Produce</option>
+                            <option value="Meat & Poultry">Meat & Poultry</option>
+                            <option value="Dairy">Dairy</option>
+                            <option value="Bakery">Bakery</option>
+                            <option value="Beverages">Beverages</option>
+                            <option value="Household">Household</option>
+                            <option value="Personal Care">Personal Care</option>
+                            <option value="Snacks & Sweets">Snacks & Sweets</option>
+                            <option value="Frozen Foods">Frozen Foods</option>
+                            <option value="Grocery">Grocery</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Unit of Measure</label>
+                        <select id="prodUOM">
+                            <option value="EA">EA (Each)</option>
+                            <option value="KG">KG</option>
+                            <option value="L">L</option>
+                            <option value="ML">ML</option>
+                            <option value="G">G</option>
+                            <option value="CTN">CTN</option>
+                            <option value="PACK">PACK</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Unit Price (USD)</label>
+                        <input type="number" id="prodPrice" value="0.00" min="0.01" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Cost Price (USD)</label>
+                        <input type="number" id="prodCost" value="0.00" min="0.01" step="0.01">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Initial Stock</label>
+                        <input type="number" id="prodStock" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Reorder Level</label>
+                        <input type="number" id="prodReorder" value="10" min="1">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="prodDesc" placeholder="Product description (optional)">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('productModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">💾 Add Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================
+    MODAL: Add User
+    ============================================ -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>👤 Add New User</h2>
+                <button class="close-btn" onclick="closeModal('userModal')">×</button>
+            </div>
+            
+            <form id="userForm" onsubmit="submitUser(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Full Name *</label>
+                        <input type="text" id="userFullName" placeholder="John Doe" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Username *</label>
+                        <input type="text" id="userUsername" placeholder="johndoe" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" id="userEmail" placeholder="john@spar.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Role *</label>
+                        <select id="userRole" required>
+                            <option value="operator">Operator</option>
+                            <option value="admin">Administrator</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Password *</label>
+                    <input type="password" id="userPassword" placeholder="Min 6 characters" required minlength="6">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">👤 Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- ============================================
     TOAST NOTIFICATION
@@ -438,26 +716,55 @@
     ============================================ -->
     <script>
         // ============================================
-        // CONFIGURATION - CHANGE THIS TO YOUR BACKEND URL
+        // CONFIGURATION
         // ============================================
-        // From your screenshot, you have these services:
-        // - spar-erp-2026 (Python backend)
-        // - spar-dynamics-erp_2 (Python backend)
-        // Use the one that's actually running
-        
         var API_URL = 'https://spar-erp-2026.onrender.com';
         // If that doesn't work, try: 'https://spar-dynamics-erp-2.onrender.com'
-        
-        // For local testing, uncomment this:
-        // var API_URL = 'http://localhost:8000';
-        
         var CLOUDFLARE_URL = API_URL;
 
         console.log('📡 API URL:', API_URL);
-        console.log('🌐 Hostname:', window.location.hostname);
 
         // ============================================
-        // NETWORK ANIMATION - ONLY ON LOGIN PAGE
+        // STATE
+        // ============================================
+        let currentUser = null;
+        let products = [];
+        let salesData = [];
+        let salesOrders = [];
+        let purchaseOrders = [];
+        let users = [];
+        let currentPage = 'dashboard';
+        let soItemCount = 1;
+        let poItemCount = 1;
+        const startTime = Date.now();
+        let todayRevenue = 0;
+        let todaySalesCount = 0;
+
+        // ============================================
+        // USERS DATABASE (Local storage)
+        // ============================================
+        const DEFAULT_USERS = [
+            { id: 1, username: 'admin', password: 'Admin@123', full_name: 'System Administrator', email: 'admin@spar.com', role: 'admin' },
+            { id: 2, username: 'operator1', password: 'Pass123', full_name: 'John Operator', email: 'john@spar.com', role: 'operator' },
+            { id: 3, username: 'operator2', password: 'Pass123', full_name: 'Jane Operator', email: 'jane@spar.com', role: 'operator' }
+        ];
+        
+        function loadUsers() {
+            const saved = localStorage.getItem('spar_users');
+            users = saved ? JSON.parse(saved) : DEFAULT_USERS;
+            if (!saved) localStorage.setItem('spar_users', JSON.stringify(users));
+        }
+        
+        function saveUsers() { localStorage.setItem('spar_users', JSON.stringify(users)); }
+        function addUser(userData) {
+            const newUser = { id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1, ...userData };
+            users.push(newUser);
+            saveUsers();
+            return newUser;
+        }
+
+        // ============================================
+        // NETWORK ANIMATION
         // ============================================
         (function() {
             const canvas = document.getElementById('networkCanvas');
@@ -571,43 +878,6 @@
         })();
 
         // ============================================
-        // STATE
-        // ============================================
-        let currentUser = null;
-        let products = [];
-        let salesData = [];
-        let salesOrders = [];
-        let purchaseOrders = [];
-        let users = [];
-        let currentPage = 'dashboard';
-        let soItemCount = 1;
-        let poItemCount = 1;
-        const startTime = Date.now();
-
-        // ============================================
-        // USERS DATABASE (Local storage)
-        // ============================================
-        const DEFAULT_USERS = [
-            { id: 1, username: 'admin', password: 'Admin@123', full_name: 'System Administrator', email: 'admin@spar.com', role: 'admin' },
-            { id: 2, username: 'operator1', password: 'Pass123', full_name: 'John Operator', email: 'john@spar.com', role: 'operator' },
-            { id: 3, username: 'operator2', password: 'Pass123', full_name: 'Jane Operator', email: 'jane@spar.com', role: 'operator' }
-        ];
-        
-        function loadUsers() {
-            const saved = localStorage.getItem('spar_users');
-            users = saved ? JSON.parse(saved) : DEFAULT_USERS;
-            if (!saved) localStorage.setItem('spar_users', JSON.stringify(users));
-        }
-        
-        function saveUsers() { localStorage.setItem('spar_users', JSON.stringify(users)); }
-        function addUser(userData) {
-            const newUser = { id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1, ...userData };
-            users.push(newUser);
-            saveUsers();
-            return newUser;
-        }
-
-        // ============================================
         // AUTHENTICATION
         // ============================================
         function handleLogin(event) {
@@ -662,11 +932,11 @@
                 loadPurchaseOrders(),
                 loadSalesData()
             ]);
+            updateDashboardMetrics();
         }
 
         async function loadProducts() {
             try {
-                console.log('🔄 Loading products from:', API_URL + '/products');
                 const response = await fetch(API_URL + '/products');
                 if (response.ok) {
                     const data = await response.json();
@@ -674,20 +944,21 @@
                     updateProductMetrics();
                     renderProducts(products);
                     populateProductSelects();
-                    console.log('✅ Loaded', products.length, 'products');
                     return;
                 }
                 // Fallback sample products
                 products = [
                     { id: 1, product_code: 'PRD001', product_name: 'Golden Delicious Apples', category_name: 'Fresh Produce', unit_price: 2.99, current_stock: 45, available_stock: 45, reorder_level: 20, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' },
                     { id: 2, product_code: 'PRD002', product_name: 'Fresh Bananas', category_name: 'Fresh Produce', unit_price: 1.49, current_stock: 60, available_stock: 60, reorder_level: 25, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' },
-                    { id: 3, product_code: 'PRD003', product_name: 'Beef Steak Rump', category_name: 'Meat & Poultry', unit_price: 12.99, current_stock: 18, available_stock: 18, reorder_level: 15, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' }
+                    { id: 3, product_code: 'PRD003', product_name: 'Beef Steak Rump', category_name: 'Meat & Poultry', unit_price: 12.99, current_stock: 18, available_stock: 18, reorder_level: 15, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' },
+                    { id: 4, product_code: 'PRD004', product_name: 'Chicken Breast Fillets', category_name: 'Meat & Poultry', unit_price: 8.99, current_stock: 5, available_stock: 5, reorder_level: 20, unit_of_measure: 'KG', stock_status: 'low-stock', stock_label: 'Low Stock' },
+                    { id: 5, product_code: 'PRD005', product_name: 'Fresh Full Cream Milk 1L', category_name: 'Dairy', unit_price: 1.99, current_stock: 8, available_stock: 8, reorder_level: 15, unit_of_measure: 'L', stock_status: 'low-stock', stock_label: 'Low Stock' },
                 ];
                 updateProductMetrics();
                 renderProducts(products);
                 populateProductSelects();
             } catch (error) {
-                console.error('❌ Error loading products:', error);
+                console.log('Error loading products:', error);
                 products = [];
                 updateProductMetrics();
                 renderProducts([]);
@@ -747,6 +1018,7 @@
                     const data = await response.json();
                     salesData = data || [];
                     updateSalesBadge();
+                    updateDashboardMetrics();
                     return;
                 }
                 salesData = [];
@@ -755,6 +1027,22 @@
                 console.log('Error loading sales:', error);
                 salesData = [];
             }
+        }
+
+        // ============================================
+        // UPDATE DASHBOARD METRICS
+        // ============================================
+        function updateDashboardMetrics() {
+            const today = new Date().toISOString().split('T')[0];
+            let todaySales = salesData.filter(s => s.sale_date === today);
+            if (currentUser && currentUser.role !== 'admin') {
+                todaySales = todaySales.filter(s => s.recorded_by === currentUser.username);
+            }
+            todayRevenue = todaySales.reduce((sum, s) => sum + parseFloat(s.total_sales || 0), 0);
+            todaySalesCount = todaySales.length;
+            
+            // Update badges
+            document.getElementById('salesBadge').textContent = todaySalesCount;
         }
 
         // ============================================
@@ -777,11 +1065,24 @@
         function getStockStatus(stock, reorder) { if (stock <= 0) return 'out-of-stock'; if (stock <= reorder) return 'low-stock'; return 'in-stock'; }
         function getStockLabel(stock, reorder) { const s = getStockStatus(stock, reorder); return { 'in-stock': 'In Stock', 'low-stock': 'Low Stock', 'out-of-stock': 'Out of Stock' }[s] || 'Unknown'; }
 
-        function openModal(id) { document.getElementById(id).classList.add('active'); }
-        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        function openModal(id) { 
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.add('active');
+            }
+        }
+        
+        function closeModal(id) { 
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
 
         document.querySelectorAll('.modal-overlay').forEach(overlay => {
-            overlay.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
+            overlay.addEventListener('click', function(e) { 
+                if (e.target === this) this.classList.remove('active'); 
+            });
         });
 
         // ============================================
@@ -873,13 +1174,12 @@
 
                 if (response.ok) {
                     const result = await response.json();
-                    showToast('✅ Sale recorded! Order: ' + result.order_number, 'success');
+                    showToast('✅ Sale recorded! Order: ' + result.order_number + ' | Total: ' + formatCurrency(result.total_amount), 'success');
                     closeModal('salesOrderModal');
                     document.getElementById('salesOrderForm').reset();
                     updateSoTotals();
                     await loadAllData();
                     loadPage('dashboard');
-                    testETL();
                     return;
                 } else {
                     const error = await response.json();
@@ -1126,6 +1426,9 @@
                 <button class="btn btn-success" onclick="openModal('salesOrderModal')">
                     <i class="fas fa-plus"></i> New Sale
                 </button>
+                <button class="btn btn-primary" onclick="openModal('productModal')">
+                    <i class="fas fa-box"></i> Add Product
+                </button>
                 <button class="btn btn-outline" onclick="refreshData()">
                     <i class="fas fa-sync"></i> Refresh
                 </button>
@@ -1133,11 +1436,11 @@
 
             switch(page) {
                 case 'dashboard': title.textContent = '📊 Role Center'; subtitle.textContent = getGreeting() + '! Here\'s your business overview.'; showDashboard(container); break;
-                case 'sales_orders': title.textContent = '📋 Sales Orders'; subtitle.textContent = 'View all sales orders and invoices.'; actions.innerHTML += `<button class="btn btn-success" onclick="openModal('salesOrderModal')"><i class="fas fa-plus"></i> New Sale</button>`; showSalesOrders(container); break;
+                case 'sales_orders': title.textContent = '📋 Sales Orders'; subtitle.textContent = 'View all sales orders and invoices.'; showSalesOrders(container); break;
                 case 'my_sales': title.textContent = '👤 My Sales'; subtitle.textContent = 'View your recorded sales.'; showMySales(container); break;
-                case 'products': title.textContent = '📦 Product Management'; subtitle.textContent = 'Manage your product catalog.'; if (currentUser?.role === 'admin') actions.innerHTML += `<button class="btn btn-primary" onclick="openModal('productModal')"><i class="fas fa-plus"></i> Add Product</button>`; showProducts(container); break;
-                case 'purchase_orders': title.textContent = '📦 Purchase Orders'; subtitle.textContent = 'Manage purchase orders.'; actions.innerHTML += `<button class="btn btn-primary" onclick="openModal('poModal')"><i class="fas fa-plus"></i> New PO</button>`; showPurchaseOrders(container); break;
-                case 'goods_receipt': title.textContent = '📥 Goods Receiving'; subtitle.textContent = 'Receive goods from suppliers.'; actions.innerHTML += `<button class="btn btn-success" onclick="openModal('goodsReceiptModal')"><i class="fas fa-plus"></i> Receive Goods</button>`; showGoodsReceipt(container); break;
+                case 'products': title.textContent = '📦 Product Management'; subtitle.textContent = 'Manage your product catalog.'; showProducts(container); break;
+                case 'purchase_orders': title.textContent = '📦 Purchase Orders'; subtitle.textContent = 'Manage purchase orders.'; showPurchaseOrders(container); break;
+                case 'goods_receipt': title.textContent = '📥 Goods Receiving'; subtitle.textContent = 'Receive goods from suppliers.'; showGoodsReceipt(container); break;
                 case 'users': title.textContent = '👤 User Management'; subtitle.textContent = 'Manage system users.'; if (currentUser?.role === 'admin') actions.innerHTML += `<button class="btn btn-primary" onclick="openModal('userModal')"><i class="fas fa-user-plus"></i> Add User</button>`; showUsers(container); break;
                 case 'settings': title.textContent = '⚙️ System Settings'; subtitle.textContent = 'View system configuration.'; showSettings(container); break;
                 default: showDashboard(container);
@@ -1157,7 +1460,7 @@
             const today = new Date().toISOString().split('T')[0];
             let todaySales = salesData.filter(s => s.sale_date === today);
             if (currentUser && currentUser.role !== 'admin') todaySales = todaySales.filter(s => s.recorded_by === currentUser.username);
-            const todayRevenue = todaySales.reduce((sum, s) => sum + parseFloat(s.total_sales || 0), 0);
+            const revenue = todaySales.reduce((sum, s) => sum + parseFloat(s.total_sales || 0), 0);
             const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled').length;
 
             container.innerHTML = `
@@ -1166,11 +1469,11 @@
                     <div class="quick-action" onclick="openModal('poModal')"><i class="fas fa-truck"></i><span class="label">New PO</span></div>
                     <div class="quick-action" onclick="loadPage('goods_receipt')"><i class="fas fa-warehouse"></i><span class="label">Receive Goods</span></div>
                     <div class="quick-action" onclick="loadPage('products')"><i class="fas fa-boxes"></i><span class="label">Products</span></div>
+                    <div class="quick-action" onclick="openModal('productModal')"><i class="fas fa-plus-circle"></i><span class="label">Add Product</span></div>
                     <div class="quick-action" onclick="loadPage('my_sales')"><i class="fas fa-user-tie"></i><span class="label">My Sales</span></div>
-                    <div class="quick-action" onclick="loadPage('users')"><i class="fas fa-users-cog"></i><span class="label">Users</span></div>
                 </div>
                 <div class="metrics-grid">
-                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value">${formatCurrency(todayRevenue)}</div><div class="label">Today's Sales</div><div class="trend up">${todaySales.length} transactions</div></div>
+                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value">${formatCurrency(revenue)}</div><div class="label">Today's Sales</div><div class="trend up">${todaySales.length} transactions</div></div>
                     <div class="metric-card"><div class="indicator green"></div><div class="icon">📦</div><div class="value">${totalProducts}</div><div class="label">Total Products</div><div class="trend up">Active catalog</div></div>
                     <div class="metric-card"><div class="indicator yellow"></div><div class="icon">⚠️</div><div class="value">${lowStock}</div><div class="label">Low Stock Items</div><div class="trend down">${lowStock > 0 ? 'Need reorder' : 'All good'}</div></div>
                     <div class="metric-card"><div class="indicator red"></div><div class="icon">📋</div><div class="value">${pendingPOs}</div><div class="label">Pending POs</div><div class="trend down">${pendingPOs > 0 ? 'Awaiting delivery' : 'None pending'}</div></div>
@@ -1437,7 +1740,7 @@
         }
 
         // ============================================
-        // SUBMIT PRODUCT - FIXED WITH BETTER ERROR HANDLING
+        // SUBMIT PRODUCT - COMPLETE WITH STOCK UPDATE
         // ============================================
         async function submitProduct(event) {
             event.preventDefault();
@@ -1458,12 +1761,9 @@
                 created_by: currentUser.username
             };
             
-            // Validate required fields
             if (!productData.product_code) { showToast('❌ Product Code is required', 'error'); return; }
             if (!productData.product_name) { showToast('❌ Product Name is required', 'error'); return; }
             if (!productData.category_name) { showToast('❌ Category is required', 'error'); return; }
-            
-            console.log('📦 Adding product:', productData);
             
             try {
                 showToast('⏳ Adding product...', 'info');
@@ -1476,7 +1776,7 @@
                 
                 if (response.ok) {
                     const result = await response.json();
-                    showToast('✅ Product "' + productData.product_name + '" added!', 'success');
+                    showToast('✅ Product "' + productData.product_name + '" added! Stock: ' + productData.initial_stock, 'success');
                     closeModal('productModal');
                     document.getElementById('productForm').reset();
                     await loadAllData();
@@ -1490,10 +1790,9 @@
                         errorMsg = 'Status ' + response.status + ': ' + response.statusText;
                     }
                     showToast('❌ Failed to add product: ' + errorMsg, 'error');
-                    console.error('❌ Product add error:', response.status, errorMsg);
                 }
             } catch (error) {
-                console.error('❌ Product add error:', error);
+                console.error('Product add error:', error);
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
             }
         }
@@ -1521,7 +1820,7 @@
         }
 
         // ============================================
-        // TEST ETL - COMPLETELY REWRITTEN
+        // TEST ETL
         // ============================================
         async function testETL() {
             const status = document.getElementById('etlStatus');
@@ -1531,79 +1830,27 @@
             status.style.color = '#f39c12';
             
             try {
-                console.log('🔍 Testing connection to:', API_URL + '/health');
-                
-                const response = await fetch(API_URL + '/health', {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
-                });
-                
+                const response = await fetch(API_URL + '/health');
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('✅ Health check response:', data);
-                    
-                    // Check if Cloudflare is connected
                     if (data.cloudflare_status === 'connected') {
                         status.textContent = '✅ Connected! Cloudflare tunnel working';
                         status.style.color = '#28a745';
                         showToast('✅ ETL Connected! Server is online.', 'success');
-                    } else if (data.cloudflare_status === 'disconnected' || data.cloudflare_status === 'not_configured') {
-                        status.textContent = '⚠️ Server online but Cloudflare not connected';
-                        status.style.color = '#f39c12';
-                        showToast('⚠️ Server online, but Cloudflare tunnel is not connected.', 'warning');
                     } else {
                         status.textContent = '✅ Server online!';
                         status.style.color = '#28a745';
                         showToast('✅ Server is online!', 'success');
                     }
-                    
-                    // Try to load products
-                    try {
-                        const productResponse = await fetch(API_URL + '/products');
-                        if (productResponse.ok) {
-                            const productsData = await productResponse.json();
-                            const count = productsData.length || 0;
-                            status.textContent = '✅ Connected! ' + count + ' products loaded';
-                            document.getElementById('salesBadge').textContent = count;
-                            document.getElementById('orderBadge').textContent = count;
-                        }
-                    } catch (e) {
-                        console.log('Products load test:', e.message);
-                    }
-                    
                     return;
                 }
-                
-                // If health check fails, try products endpoint
-                const productResponse = await fetch(API_URL + '/products');
-                if (productResponse.ok) {
-                    const productsData = await productResponse.json();
-                    const count = productsData.length || 0;
-                    status.textContent = '✅ Connected! ' + count + ' products loaded';
-                    status.style.color = '#28a745';
-                    document.getElementById('salesBadge').textContent = count;
-                    document.getElementById('orderBadge').textContent = count;
-                    showToast('✅ Connected! ' + count + ' products loaded', 'success');
-                    return;
-                }
-                
                 status.textContent = '⚠️ Server responded but no data';
                 status.style.color = '#f39c12';
-                showToast('⚠️ Server connected but no data', 'info');
-                
             } catch (error) {
-                console.error('❌ ETL Test Error:', error);
-                
-                // Check if it's a network error
-                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                    status.textContent = '❌ Cannot reach server! Check API URL.';
-                    status.style.color = '#dc3545';
-                    showToast('❌ Cannot connect to server! Check API URL: ' + API_URL, 'error');
-                } else {
-                    status.textContent = '❌ Error: ' + error.message;
-                    status.style.color = '#dc3545';
-                    showToast('❌ Error connecting to server: ' + error.message, 'error');
-                }
+                console.error('ETL Test Error:', error);
+                status.textContent = '❌ Cannot reach server! Check API URL.';
+                status.style.color = '#dc3545';
+                showToast('❌ Cannot connect to server!', 'error');
             }
         }
 
@@ -1644,18 +1891,14 @@
         const urlDisplay = document.getElementById('etlUrlDisplay');
         if (urlDisplay) urlDisplay.textContent = API_URL;
         
-        // Wait for everything to load then test ETL
         setTimeout(function() {
             testETL();
             loadAllData();
         }, 2000);
         
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
-        console.log('👥 Users:', users.length);
         console.log('📡 API URL:', API_URL);
         console.log('🔑 Default: admin / Admin@123');
-        console.log('🚀 Ready for deployment!');
     </script>
-
 </body>
 </html>
