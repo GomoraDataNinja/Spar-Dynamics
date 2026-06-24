@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import pymssql
+import pytds
 import json
 from datetime import time, datetime, date
 import decimal
@@ -10,7 +10,7 @@ app = Flask(__name__)
 CORS(app)
 
 # ============================================
-# CUSTOM JSON ENCODER - FIXES TIME SERIALIZATION
+# CUSTOM JSON ENCODER
 # ============================================
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -30,17 +30,18 @@ app.json_encoder = CustomJSONEncoder
 # DATABASE CONNECTION
 # ============================================
 def get_db_connection():
-    # Use environment variables for security
     server = os.environ.get('DB_SERVER', 'your_server.database.windows.net')
     database = os.environ.get('DB_NAME', 'SPAR_ETL')
     username = os.environ.get('DB_USER', 'your_username')
     password = os.environ.get('DB_PASSWORD', 'your_password')
     
-    return pymssql.connect(
+    return pytds.connect(
         server=server,
         user=username,
         password=password,
         database=database,
+        port=1433,
+        autocommit=False,
         timeout=30
     )
 
@@ -53,7 +54,15 @@ def index():
     return jsonify({
         'status': 'running',
         'message': 'SPAR Dynamics 365 Backend API',
-        'version': '1.0.0'
+        'version': '1.0.0',
+        'endpoints': {
+            '/health': 'Check database connection',
+            '/sales-orders': 'Get all sales orders (GET) or create new (POST)',
+            '/products': 'Get all products',
+            '/recent': 'Get recent sales',
+            '/webhook': 'Webhook endpoint for ETL',
+            '/purchase-orders': 'Get purchase orders (GET) or create new (POST)'
+        }
     })
 
 @app.route('/health', methods=['GET'])
@@ -130,13 +139,13 @@ def create_sales_order():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get customer or create new
         customer_name = data.get('customer_name', '').strip()
         customer_email = data.get('customer_email', '').strip()
         
+        # Check if customer exists
         cursor.execute("""
             SELECT id FROM erp_customers 
-            WHERE LTRIM(RTRIM(customer_name)) = LTRIM(RTRIM(%s))
+            WHERE LTRIM(RTRIM(customer_name)) = LTRIM(RTRIM(?))
         """, (customer_name,))
         customer_row = cursor.fetchone()
         
@@ -153,7 +162,7 @@ def create_sales_order():
                     payment_terms,
                     is_active,
                     created_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, GETDATE())
+                ) VALUES (?, ?, ?, ?, ?, ?, GETDATE())
             """, (
                 'CUST-' + datetime.now().strftime('%Y%m%d%H%M%S'),
                 customer_name,
@@ -162,7 +171,8 @@ def create_sales_order():
                 'Cash',
                 1
             ))
-            customer_id = cursor.execute("SELECT SCOPE_IDENTITY()").fetchone()[0]
+            cursor.execute("SELECT SCOPE_IDENTITY()")
+            customer_id = cursor.fetchone()[0]
         
         # Generate SO number
         cursor.execute("""
@@ -196,7 +206,7 @@ def create_sales_order():
                 payment_status,
                 created_at,
                 updated_at
-            ) VALUES (%s, %s, GETDATE(), CAST(%s AS TIME), %s, %s, %s, %s, %s, %s, GETDATE(), GETDATE())
+            ) VALUES (?, ?, GETDATE(), CAST(? AS TIME), ?, ?, ?, ?, ?, ?, GETDATE(), GETDATE())
         """, (
             so_number,
             customer_id,
@@ -209,7 +219,8 @@ def create_sales_order():
             'Paid'
         ))
         
-        order_id = cursor.execute("SELECT SCOPE_IDENTITY()").fetchone()[0]
+        cursor.execute("SELECT SCOPE_IDENTITY()")
+        order_id = cursor.fetchone()[0]
         
         # Insert order lines and update stock
         for idx, item in enumerate(data.get('items', [])):
@@ -221,7 +232,7 @@ def create_sales_order():
             
             # Get product info
             cursor.execute("""
-                SELECT product_code, product_name FROM erp_products WHERE id = %s
+                SELECT product_code, product_name FROM erp_products WHERE id = ?
             """, (product_id,))
             product = cursor.fetchone()
             
@@ -240,7 +251,7 @@ def create_sales_order():
                     tax_amount,
                     created_at,
                     updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, GETDATE(), GETDATE())
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), GETDATE())
             """, (
                 order_id,
                 idx + 1,
@@ -257,67 +268,13 @@ def create_sales_order():
             # Update stock
             cursor.execute("""
                 UPDATE erp_products 
-                SET current_stock = current_stock - %s,
-                    available_stock = available_stock - %s
-                WHERE id = %s
+                SET current_stock = current_stock - ?,
+                    available_stock = available_stock - ?
+                WHERE id = ?
             """, (quantity, quantity, product_id))
         
         conn.commit()
         conn.close()
-        
-        # Also insert into etl_sales_raw for ETL processing
-        try:
-            etl_conn = get_db_connection()
-            etl_cursor = etl_conn.cursor()
-            
-            sale_data = data.get('items', [])
-            product_names = []
-            product_categories = []
-            total_qty = 0
-            total_value = 0
-            
-            for item in sale_data:
-                cursor.execute("SELECT product_name, category_name FROM erp_products WHERE id = %s", (item['product_id'],))
-                p = cursor.fetchone()
-                if p:
-                    product_names.append(p[0])
-                    product_categories.append(p[1] or 'General')
-                total_qty += item['quantity']
-                total_value += item['quantity'] * item['unit_price']
-            
-            etl_cursor.execute("""
-                INSERT INTO etl_sales_raw (
-                    sale_id,
-                    customer_name,
-                    customer_email,
-                    product_category,
-                    quantity,
-                    unit_price,
-                    total_sales,
-                    rewards_earned,
-                    sale_date,
-                    sale_time,
-                    timestamp_utc,
-                    recorded_by,
-                    etl_processed,
-                    created_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, GETDATE(), CAST(%s AS TIME), GETUTCDATE(), %s, 0, GETDATE())
-            """, (
-                so_number,
-                customer_name,
-                customer_email,
-                ', '.join(product_categories[:3]),
-                total_qty,
-                sale_data[0]['unit_price'] if sale_data else 0,
-                total_value,
-                rewards_earned,
-                datetime.now().strftime('%H:%M:%S'),
-                data.get('recorded_by', 'system')
-            ))
-            etl_conn.commit()
-            etl_conn.close()
-        except Exception as e:
-            print(f"ETL insert error: {e}")
         
         return jsonify({
             'success': True,
@@ -412,7 +369,7 @@ def add_product():
                 is_active,
                 created_at,
                 updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 1, GETDATE(), GETDATE())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, GETDATE(), GETDATE())
         """, (
             data['product_code'],
             data['product_name'],
@@ -498,7 +455,7 @@ def create_purchase_order():
                 status,
                 created_by,
                 created_at
-            ) VALUES (%s, %s, %s, GETDATE(), %s, %s, %s, %s, %s, %s, GETDATE())
+            ) VALUES (?, ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, GETDATE())
         """, (
             po_number,
             data['supplier_name'],
@@ -511,7 +468,8 @@ def create_purchase_order():
             data.get('created_by', 'system')
         ))
         
-        po_id = cursor.execute("SELECT SCOPE_IDENTITY()").fetchone()[0]
+        cursor.execute("SELECT SCOPE_IDENTITY()")
+        po_id = cursor.fetchone()[0]
         
         for idx, item in enumerate(data.get('items', [])):
             cursor.execute("""
@@ -525,7 +483,7 @@ def create_purchase_order():
                     unit_price,
                     line_total,
                     created_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, GETDATE())
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, GETDATE())
             """, (
                 po_id,
                 idx + 1,
@@ -611,7 +569,7 @@ def webhook():
                 recorded_by,
                 etl_processed,
                 created_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, GETDATE())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, GETDATE())
         """, (
             data.get('sale_id'),
             data.get('customer_name'),
