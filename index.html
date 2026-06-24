@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
+        /* ... (keep all your existing styles) ... */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: #202124; height: 100vh; overflow: hidden; }
         
@@ -216,6 +217,28 @@
         ::-webkit-scrollbar-track { background: #f0f2f5; }
         ::-webkit-scrollbar-thumb { background: #c1c7cd; border-radius: 8px; }
         ::-webkit-scrollbar-thumb:hover { background: #a0a7ae; }
+        
+        /* Debug console styles */
+        .debug-console {
+            background: #1a1a2e;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+            border: 1px solid #333;
+        }
+        .debug-console .log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid #222;
+        }
+        .debug-console .log-entry.error { color: #ff4444; }
+        .debug-console .log-entry.success { color: #44ff44; }
+        .debug-console .log-entry.warning { color: #ffaa44; }
+        .debug-console .log-entry.info { color: #44aaff; }
     </style>
 </head>
 <body>
@@ -419,6 +442,12 @@
             <!-- Content Container -->
             <div id="contentContainer">
                 <!-- Dynamic content loaded here -->
+            </div>
+            
+            <!-- Debug Console -->
+            <div class="debug-console" id="debugConsole">
+                <div class="log-entry info">🚀 Debug Console Started...</div>
+                <div class="log-entry info">📡 API URL: <span id="debugApiUrl">Loading...</span></div>
             </div>
             
             <!-- Footer -->
@@ -712,17 +741,39 @@
     <div id="toast" class="toast" style="display: none;"></div>
 
     <!-- ============================================
-    JAVASCRIPT - COMPLETE WORKING VERSION
+    JAVASCRIPT - COMPLETE WORKING VERSION WITH DEBUGGING
     ============================================ -->
     <script>
         // ============================================
         // CONFIGURATION
         // ============================================
         var API_URL = 'https://spar-erp-2026.onrender.com';
-        // If that doesn't work, try: 'https://spar-dynamics-erp-2.onrender.com'
         var CLOUDFLARE_URL = API_URL;
 
         console.log('📡 API URL:', API_URL);
+
+        // ============================================
+        // DEBUG CONSOLE
+        // ============================================
+        function debugLog(message, type = 'info') {
+            const console = document.getElementById('debugConsole');
+            if (!console) return;
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            entry.textContent = '[' + new Date().toLocaleTimeString() + '] ' + message;
+            console.appendChild(entry);
+            console.scrollTop = console.scrollHeight;
+            // Keep last 50 entries
+            while (console.children.length > 50) {
+                console.removeChild(console.firstChild);
+            }
+        }
+
+        // Update debug console with API URL
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlSpan = document.getElementById('debugApiUrl');
+            if (urlSpan) urlSpan.textContent = API_URL;
+        });
 
         // ============================================
         // STATE
@@ -737,8 +788,6 @@
         let soItemCount = 1;
         let poItemCount = 1;
         const startTime = Date.now();
-        let todayRevenue = 0;
-        let todaySalesCount = 0;
 
         // ============================================
         // USERS DATABASE (Local storage)
@@ -901,6 +950,8 @@
                 
                 document.getElementById('adminMenu').style.display = user.role === 'admin' ? 'block' : 'none';
                 
+                debugLog('✅ User logged in: ' + user.full_name, 'success');
+                
                 setTimeout(() => {
                     loadAllData();
                     loadPage('dashboard');
@@ -909,6 +960,7 @@
                 showToast('✅ Welcome, ' + user.full_name + '!', 'success');
             } else {
                 errorEl.textContent = '❌ Invalid username or password';
+                debugLog('❌ Failed login attempt for: ' + username, 'error');
             }
         }
 
@@ -919,6 +971,7 @@
             document.getElementById('networkContainer').classList.remove('hidden');
             document.getElementById('loginPassword').value = '';
             document.getElementById('loginError').textContent = '';
+            debugLog('👋 User logged out', 'info');
             showToast('👋 Logged out successfully', 'info');
         }
 
@@ -926,6 +979,7 @@
         // LOAD DATA
         // ============================================
         async function loadAllData() {
+            debugLog('🔄 Loading all data...', 'info');
             await Promise.all([
                 loadProducts(),
                 loadSalesOrders(),
@@ -933,32 +987,34 @@
                 loadSalesData()
             ]);
             updateDashboardMetrics();
+            debugLog('✅ All data loaded successfully', 'success');
         }
 
         async function loadProducts() {
             try {
+                debugLog('📦 Fetching products from: ' + API_URL + '/products', 'info');
                 const response = await fetch(API_URL + '/products');
                 if (response.ok) {
                     const data = await response.json();
                     products = data || [];
+                    debugLog('✅ Loaded ' + products.length + ' products', 'success');
                     updateProductMetrics();
                     renderProducts(products);
                     populateProductSelects();
                     return;
                 }
+                debugLog('⚠️ Products API returned status: ' + response.status, 'warning');
                 // Fallback sample products
                 products = [
                     { id: 1, product_code: 'PRD001', product_name: 'Golden Delicious Apples', category_name: 'Fresh Produce', unit_price: 2.99, current_stock: 45, available_stock: 45, reorder_level: 20, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' },
                     { id: 2, product_code: 'PRD002', product_name: 'Fresh Bananas', category_name: 'Fresh Produce', unit_price: 1.49, current_stock: 60, available_stock: 60, reorder_level: 25, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' },
-                    { id: 3, product_code: 'PRD003', product_name: 'Beef Steak Rump', category_name: 'Meat & Poultry', unit_price: 12.99, current_stock: 18, available_stock: 18, reorder_level: 15, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' },
-                    { id: 4, product_code: 'PRD004', product_name: 'Chicken Breast Fillets', category_name: 'Meat & Poultry', unit_price: 8.99, current_stock: 5, available_stock: 5, reorder_level: 20, unit_of_measure: 'KG', stock_status: 'low-stock', stock_label: 'Low Stock' },
-                    { id: 5, product_code: 'PRD005', product_name: 'Fresh Full Cream Milk 1L', category_name: 'Dairy', unit_price: 1.99, current_stock: 8, available_stock: 8, reorder_level: 15, unit_of_measure: 'L', stock_status: 'low-stock', stock_label: 'Low Stock' },
+                    { id: 3, product_code: 'PRD003', product_name: 'Beef Steak Rump', category_name: 'Meat & Poultry', unit_price: 12.99, current_stock: 18, available_stock: 18, reorder_level: 15, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' }
                 ];
                 updateProductMetrics();
                 renderProducts(products);
                 populateProductSelects();
             } catch (error) {
-                console.log('Error loading products:', error);
+                debugLog('❌ Error loading products: ' + error.message, 'error');
                 products = [];
                 updateProductMetrics();
                 renderProducts([]);
@@ -986,11 +1042,12 @@
                     const data = await response.json();
                     salesOrders = data || [];
                     document.getElementById('orderBadge').textContent = salesOrders.length;
+                    debugLog('✅ Loaded ' + salesOrders.length + ' sales orders', 'success');
                     return;
                 }
                 salesOrders = [];
             } catch (error) {
-                console.log('Error loading sales orders:', error);
+                debugLog('❌ Error loading sales orders: ' + error.message, 'error');
                 salesOrders = [];
             }
         }
@@ -1002,11 +1059,12 @@
                     const data = await response.json();
                     purchaseOrders = data || [];
                     document.getElementById('poBadge').textContent = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled').length;
+                    debugLog('✅ Loaded ' + purchaseOrders.length + ' purchase orders', 'success');
                     return;
                 }
                 purchaseOrders = [];
             } catch (error) {
-                console.log('Error loading purchase orders:', error);
+                debugLog('❌ Error loading purchase orders: ' + error.message, 'error');
                 purchaseOrders = [];
             }
         }
@@ -1019,12 +1077,13 @@
                     salesData = data || [];
                     updateSalesBadge();
                     updateDashboardMetrics();
+                    debugLog('✅ Loaded ' + salesData.length + ' recent sales', 'success');
                     return;
                 }
                 salesData = [];
                 updateSalesBadge();
             } catch (error) {
-                console.log('Error loading sales:', error);
+                debugLog('❌ Error loading sales data: ' + error.message, 'error');
                 salesData = [];
             }
         }
@@ -1038,11 +1097,9 @@
             if (currentUser && currentUser.role !== 'admin') {
                 todaySales = todaySales.filter(s => s.recorded_by === currentUser.username);
             }
-            todayRevenue = todaySales.reduce((sum, s) => sum + parseFloat(s.total_sales || 0), 0);
-            todaySalesCount = todaySales.length;
-            
-            // Update badges
-            document.getElementById('salesBadge').textContent = todaySalesCount;
+            const revenue = todaySales.reduce((sum, s) => sum + parseFloat(s.total_sales || 0), 0);
+            document.getElementById('salesBadge').textContent = todaySales.length;
+            debugLog('📊 Today\'s sales: ' + todaySales.length + ' transactions, $' + revenue.toFixed(2), 'info');
         }
 
         // ============================================
@@ -1069,6 +1126,9 @@
             const modal = document.getElementById(id);
             if (modal) {
                 modal.classList.add('active');
+                debugLog('📂 Opened modal: ' + id, 'info');
+            } else {
+                debugLog('❌ Modal not found: ' + id, 'error');
             }
         }
         
@@ -1137,7 +1197,11 @@
 
         async function submitSalesOrder(event) {
             event.preventDefault();
-            if (!currentUser) { showToast('❌ Please login first', 'error'); return; }
+            if (!currentUser) { 
+                showToast('❌ Please login first', 'error');
+                debugLog('❌ Attempted sale without login', 'error');
+                return; 
+            }
 
             const items = [];
             document.querySelectorAll('[id^="soProductId_"]').forEach((el, i) => {
@@ -1149,12 +1213,20 @@
                 }
             });
 
-            if (items.length === 0) { showToast('❌ Please add at least one item', 'error'); return; }
+            if (items.length === 0) { 
+                showToast('❌ Please add at least one item', 'error');
+                debugLog('❌ Sale submitted with no items', 'error');
+                return; 
+            }
 
             const customerName = document.getElementById('soCustomerName').value.trim();
             const customerEmail = document.getElementById('soCustomerEmail').value.trim();
 
-            if (!customerName) { showToast('❌ Please enter a customer name', 'error'); return; }
+            if (!customerName) { 
+                showToast('❌ Please enter a customer name', 'error');
+                debugLog('❌ Sale submitted with no customer name', 'error');
+                return; 
+            }
 
             const orderData = {
                 customer_name: customerName,
@@ -1162,6 +1234,8 @@
                 items: items,
                 recorded_by: currentUser.username
             };
+
+            debugLog('📝 Submitting sale: ' + JSON.stringify(orderData), 'info');
 
             try {
                 showToast('⏳ Recording sale...', 'info');
@@ -1174,6 +1248,7 @@
 
                 if (response.ok) {
                     const result = await response.json();
+                    debugLog('✅ Sale recorded successfully! Order: ' + result.order_number + ', Total: ' + result.total_amount, 'success');
                     showToast('✅ Sale recorded! Order: ' + result.order_number + ' | Total: ' + formatCurrency(result.total_amount), 'success');
                     closeModal('salesOrderModal');
                     document.getElementById('salesOrderForm').reset();
@@ -1183,10 +1258,11 @@
                     return;
                 } else {
                     const error = await response.json();
+                    debugLog('❌ Sale failed: ' + (error.error || 'Unknown error'), 'error');
                     showToast('❌ Error: ' + (error.error || 'Server error'), 'error');
                 }
             } catch (error) {
-                console.error('Sale error:', error);
+                debugLog('❌ Sale error: ' + error.message, 'error');
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
             }
         }
@@ -1269,6 +1345,7 @@
 
                 if (response.ok) {
                     const result = await response.json();
+                    debugLog('✅ PO created: ' + result.po_number, 'success');
                     showToast('✅ Purchase Order ' + result.po_number + ' created!', 'success');
                     closeModal('poModal');
                     document.getElementById('poForm').reset();
@@ -1277,9 +1354,11 @@
                     loadPage('purchase_orders');
                 } else {
                     const error = await response.json();
+                    debugLog('❌ PO creation failed: ' + (error.error || 'Unknown error'), 'error');
                     showToast('❌ Error: ' + error.error, 'error');
                 }
             } catch (error) {
+                debugLog('❌ PO error: ' + error.message, 'error');
                 showToast('❌ Cannot connect to server', 'error');
             }
         }
@@ -1302,8 +1381,11 @@
                         opt.textContent = po.po_number + ' - ' + po.supplier_name;
                         select.appendChild(opt);
                     });
+                    debugLog('✅ Loaded ' + pending.length + ' pending POs for receiving', 'success');
                 }
-            } catch (error) { console.log('Error loading POs:', error); }
+            } catch (error) { 
+                debugLog('❌ Error loading POs: ' + error.message, 'error');
+            }
         }
 
         async function submitGoodsReceipt(event) {
@@ -1312,6 +1394,7 @@
             const poSelect = document.getElementById('grPoSelect');
             if (!poSelect.value) { showToast('❌ Please select a purchase order', 'error'); return; }
             
+            debugLog('📥 Goods received for PO: ' + poSelect.value, 'success');
             showToast('✅ Goods received for PO ' + poSelect.value + '! Stock updated.', 'success');
             closeModal('goodsReceiptModal');
             await loadAllData();
@@ -1746,6 +1829,7 @@
             event.preventDefault();
             if (!currentUser || currentUser.role !== 'admin') { 
                 showToast('❌ Admin access required', 'error'); 
+                debugLog('❌ Non-admin attempted to add product', 'error');
                 return; 
             }
             
@@ -1761,9 +1845,23 @@
                 created_by: currentUser.username
             };
             
-            if (!productData.product_code) { showToast('❌ Product Code is required', 'error'); return; }
-            if (!productData.product_name) { showToast('❌ Product Name is required', 'error'); return; }
-            if (!productData.category_name) { showToast('❌ Category is required', 'error'); return; }
+            if (!productData.product_code) { 
+                showToast('❌ Product Code is required', 'error');
+                debugLog('❌ Product code missing', 'error');
+                return; 
+            }
+            if (!productData.product_name) { 
+                showToast('❌ Product Name is required', 'error');
+                debugLog('❌ Product name missing', 'error');
+                return; 
+            }
+            if (!productData.category_name) { 
+                showToast('❌ Category is required', 'error');
+                debugLog('❌ Category missing', 'error');
+                return; 
+            }
+            
+            debugLog('📦 Adding product: ' + JSON.stringify(productData), 'info');
             
             try {
                 showToast('⏳ Adding product...', 'info');
@@ -1776,6 +1874,7 @@
                 
                 if (response.ok) {
                     const result = await response.json();
+                    debugLog('✅ Product added successfully! ID: ' + (result.id || 'N/A'), 'success');
                     showToast('✅ Product "' + productData.product_name + '" added! Stock: ' + productData.initial_stock, 'success');
                     closeModal('productModal');
                     document.getElementById('productForm').reset();
@@ -1789,10 +1888,11 @@
                     } catch (e) {
                         errorMsg = 'Status ' + response.status + ': ' + response.statusText;
                     }
+                    debugLog('❌ Product add failed: ' + errorMsg, 'error');
                     showToast('❌ Failed to add product: ' + errorMsg, 'error');
                 }
             } catch (error) {
-                console.error('Product add error:', error);
+                debugLog('❌ Product add error: ' + error.message, 'error');
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
             }
         }
@@ -1802,9 +1902,16 @@
         // ============================================
         function submitUser(event) {
             event.preventDefault();
-            if (!currentUser || currentUser.role !== 'admin') { showToast('❌ Admin access required', 'error'); return; }
+            if (!currentUser || currentUser.role !== 'admin') { 
+                showToast('❌ Admin access required', 'error'); 
+                return; 
+            }
             const username = document.getElementById('userUsername').value.trim();
-            if (users.find(u => u.username === username)) { showToast('❌ Username already exists', 'error'); return; }
+            if (users.find(u => u.username === username)) { 
+                showToast('❌ Username already exists', 'error');
+                debugLog('❌ Username already exists: ' + username, 'error');
+                return; 
+            }
             const userData = {
                 username: username,
                 password: document.getElementById('userPassword').value,
@@ -1813,6 +1920,7 @@
                 role: document.getElementById('userRole').value
             };
             addUser(userData);
+            debugLog('✅ User created: ' + userData.full_name + ' (' + userData.role + ')', 'success');
             showToast('✅ User ' + userData.full_name + ' created!', 'success');
             closeModal('userModal');
             document.getElementById('userForm').reset();
@@ -1828,11 +1936,13 @@
             
             status.textContent = '🔄 Testing connection...';
             status.style.color = '#f39c12';
+            debugLog('🔍 Testing ETL connection to: ' + API_URL, 'info');
             
             try {
                 const response = await fetch(API_URL + '/health');
                 if (response.ok) {
                     const data = await response.json();
+                    debugLog('✅ Health check passed: ' + JSON.stringify(data), 'success');
                     if (data.cloudflare_status === 'connected') {
                         status.textContent = '✅ Connected! Cloudflare tunnel working';
                         status.style.color = '#28a745';
@@ -1846,8 +1956,9 @@
                 }
                 status.textContent = '⚠️ Server responded but no data';
                 status.style.color = '#f39c12';
+                debugLog('⚠️ Health check returned status: ' + response.status, 'warning');
             } catch (error) {
-                console.error('ETL Test Error:', error);
+                debugLog('❌ ETL Test Error: ' + error.message, 'error');
                 status.textContent = '❌ Cannot reach server! Check API URL.';
                 status.style.color = '#dc3545';
                 showToast('❌ Cannot connect to server!', 'error');
@@ -1858,6 +1969,7 @@
         // REFRESH DATA
         // ============================================
         function refreshData() {
+            debugLog('🔄 Manual refresh triggered', 'info');
             loadAllData();
             showToast('🔄 Data refreshed', 'info');
             if (currentPage === 'dashboard') loadPage('dashboard');
@@ -1871,9 +1983,18 @@
         // ============================================
         // OTHER FUNCTIONS
         // ============================================
-        function showNotification() { showToast('📬 No new notifications', 'info'); }
-        function showAbout() { showToast('🏢 SPAR Dynamics 365 v2.0\n© 2026 Yellowcob Enterprises Pvt Ltd', 'info'); }
-        function showUserMenu() { showToast('👤 ' + (currentUser ? currentUser.full_name : 'Guest'), 'info'); }
+        function showNotification() { 
+            showToast('📬 No new notifications', 'info');
+            debugLog('🔔 Notification clicked', 'info');
+        }
+        function showAbout() { 
+            showToast('🏢 SPAR Dynamics 365 v2.0\n© 2026 Yellowcob Enterprises Pvt Ltd', 'info');
+            debugLog('ℹ️ About dialog shown', 'info');
+        }
+        function showUserMenu() { 
+            showToast('👤 ' + (currentUser ? currentUser.full_name : 'Guest'), 'info');
+            debugLog('👤 User menu clicked: ' + (currentUser ? currentUser.full_name : 'Guest'), 'info');
+        }
 
         // ============================================
         // KEYBOARD SHORTCUTS
@@ -1896,9 +2017,14 @@
             loadAllData();
         }, 2000);
         
+        debugLog('🚀 SPAR Dynamics 365 v2.0 Initialized', 'success');
+        debugLog('📡 API URL: ' + API_URL, 'info');
+        debugLog('🔑 Default: admin / Admin@123', 'info');
+        
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
         console.log('📡 API URL:', API_URL);
         console.log('🔑 Default: admin / Admin@123');
+        console.log('💡 Check the debug console below for real-time logs');
     </script>
 </body>
 </html>
