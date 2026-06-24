@@ -19,27 +19,19 @@ app = Flask(__name__)
 # CONFIGURATION - From Environment Variables
 # ============================================
 
-# Your Cloudflare URL that exposes your local SQL Server API
-CLOUDFLARE_API_URL = os.environ.get('CLOUDFLARE_API_URL', 'https://distinguished-geography-mlb-hebrew.trycloudflare.com')
+CLOUDFLARE_API_URL = os.environ.get('CLOUDFLARE_API_URL', 'https://document-designing-drill-location.trycloudflare.com')
 
 # ============================================
 # DATABASE CONNECTION - Via Cloudflare API
 # ============================================
 
 def execute_query_via_cloudflare(query, params=None):
-    """
-    Execute a SELECT query by forwarding to your local SQL Server via Cloudflare
-    """
     try:
         response = requests.post(
             f"{CLOUDFLARE_API_URL}/execute-query",
-            json={
-                "query": query,
-                "params": params or []
-            },
+            json={"query": query, "params": params or []},
             timeout=60
         )
-        
         if response.status_code == 200:
             return response.json()
         else:
@@ -50,19 +42,12 @@ def execute_query_via_cloudflare(query, params=None):
         return []
 
 def execute_command_via_cloudflare(query, params=None):
-    """
-    Execute an INSERT/UPDATE/DELETE command via Cloudflare
-    """
     try:
         response = requests.post(
             f"{CLOUDFLARE_API_URL}/execute-command",
-            json={
-                "query": query,
-                "params": params or []
-            },
+            json={"query": query, "params": params or []},
             timeout=60
         )
-        
         if response.status_code == 200:
             return response.json()
         else:
@@ -123,7 +108,6 @@ def get_products():
             WHERE p.is_active = 1
             ORDER BY pc.category_name, p.product_name
         """
-        
         result = execute_query_via_cloudflare(query)
         return jsonify(result), 200
     except Exception as e:
@@ -132,14 +116,10 @@ def get_products():
 
 @app.route('/products/add', methods=['POST'])
 def add_product():
-    """
-    Add a new product to the database
-    """
     try:
         data = request.json
         logger.info(f"Adding product: {data.get('product_name')}")
         
-        # Get category ID from category name
         category_query = "SELECT id FROM erp_product_categories WHERE category_name = ?"
         category_result = execute_query_via_cloudflare(category_query, [data.get('category_name')])
         
@@ -148,14 +128,12 @@ def add_product():
         
         category_id = category_result[0]['id']
         
-        # Check if product code already exists
         check_query = "SELECT id FROM erp_products WHERE product_code = ?"
         check_result = execute_query_via_cloudflare(check_query, [data['product_code']])
         
         if check_result:
             return jsonify({"error": f"Product code '{data['product_code']}' already exists"}), 400
         
-        # Insert new product
         insert_query = """
             INSERT INTO erp_products (
                 product_code, product_name, category_id, unit_of_measure,
@@ -173,7 +151,7 @@ def add_product():
             float(data.get('cost_price', 0)),
             int(data.get('initial_stock', 0)),
             int(data.get('reorder_level', 10)),
-            1,  # is_active
+            1,
             data.get('created_by', 'system')
         )
         
@@ -196,6 +174,8 @@ def add_product():
 def create_sales_order():
     try:
         data = request.json
+        logger.info(f"Creating sales order for: {data.get('customer_name')}")
+        
         order_number = 'SO-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
         
         items = data.get('items', [])
@@ -205,26 +185,43 @@ def create_sales_order():
         rewards = total * 0.02
         
         # Get or create customer
+        customer_name = data['customer_name'].strip()
+        customer_email = data.get('customer_email', '').strip()
+        
+        # First, try to find existing customer
         customer_query = "SELECT id FROM erp_customers WHERE customer_name = ?"
-        customer_result = execute_query_via_cloudflare(customer_query, [data['customer_name']])
+        customer_result = execute_query_via_cloudflare(customer_query, [customer_name])
         
         if customer_result:
             customer_id = customer_result[0]['id']
+            logger.info(f"Found existing customer: {customer_name} (ID: {customer_id})")
         else:
-            # Create customer
-            insert_customer = """
-                INSERT INTO erp_customers (customer_code, customer_name, customer_type, email)
-                VALUES (?, ?, ?, ?)
-            """
+            # Create new customer
             customer_code = 'CUST-' + datetime.now().strftime('%Y%m%d%H%M%S')
-            execute_command_via_cloudflare(
+            insert_customer = """
+                INSERT INTO erp_customers (customer_code, customer_name, customer_type, email, is_active)
+                VALUES (?, ?, ?, ?, 1)
+            """
+            logger.info(f"Creating new customer: {customer_name}")
+            
+            result = execute_command_via_cloudflare(
                 insert_customer,
-                [customer_code, data['customer_name'], 'Retail', data.get('customer_email', '')]
+                [customer_code, customer_name, 'Retail', customer_email]
             )
+            
+            if not result.get('success', False):
+                logger.error(f"Failed to create customer: {result}")
+                return jsonify({"error": "Failed to create customer"}), 500
+            
             # Get the new customer ID
-            customer_result = execute_query_via_cloudflare(customer_query, [data['customer_name']])
-            customer_id = customer_result[0]['id'] if customer_result else None
+            customer_result = execute_query_via_cloudflare(customer_query, [customer_name])
+            if customer_result:
+                customer_id = customer_result[0]['id']
+                logger.info(f"Created new customer: {customer_name} (ID: {customer_id})")
+            else:
+                return jsonify({"error": "Failed to retrieve new customer"}), 500
         
+        # Insert sales order
         insert_order_query = """
             INSERT INTO erp_sales_orders (
                 so_number, customer_id, order_date, order_time,
@@ -243,10 +240,13 @@ def create_sales_order():
         result = execute_command_via_cloudflare(insert_order_query, order_params)
         
         if not result.get('success', False):
+            logger.error(f"Failed to create order: {result}")
             return jsonify({"error": "Failed to create order"}), 500
         
         order_id = result.get('id', 0)
+        logger.info(f"Created order: {order_number} (ID: {order_id})")
         
+        # Insert order lines and update stock
         for i, item in enumerate(items):
             product_query = """
                 SELECT product_code, product_name, current_stock
@@ -259,6 +259,13 @@ def create_sales_order():
                 continue
             
             product = product_result[0]
+            
+            # Check stock
+            if product.get('current_stock', 0) < item['quantity']:
+                logger.error(f"Insufficient stock for {product['product_name']}")
+                return jsonify({
+                    "error": f"Insufficient stock for {product['product_name']}. Available: {product['current_stock']}"
+                }), 400
             
             line_query = """
                 INSERT INTO erp_sales_order_lines (
@@ -274,11 +281,13 @@ def create_sales_order():
             )
             execute_command_via_cloudflare(line_query, line_params)
             
+            # Update stock
             update_stock_query = """
                 UPDATE erp_products SET current_stock = current_stock - ? WHERE id = ?
             """
             execute_command_via_cloudflare(update_stock_query, (item['quantity'], item['product_id']))
         
+        # Create invoice
         invoice_number = 'INV-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
         invoice_query = """
             INSERT INTO erp_sales_invoices (
@@ -296,6 +305,8 @@ def create_sales_order():
         )
         execute_command_via_cloudflare(invoice_query, invoice_params)
         
+        logger.info(f"Sale completed: {order_number} | Invoice: {invoice_number} | Total: {total}")
+        
         return jsonify({
             "status": "success",
             "order_number": order_number,
@@ -306,6 +317,8 @@ def create_sales_order():
         
     except Exception as e:
         logger.error(f"Error creating sales order: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/sales-orders', methods=['GET'])
@@ -546,7 +559,6 @@ def get_sales_stats():
             WHERE order_date = CAST(GETDATE() AS DATE)
         """
         result = execute_query_via_cloudflare(query)
-        
         stats = result[0] if result else {}
         
         return jsonify({
@@ -565,7 +577,6 @@ def receive_goods():
         data = request.json
         receipt_number = 'GRN-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
         
-        # Get PO details
         po_query = "SELECT id, supplier_id FROM erp_purchase_orders WHERE po_number = ?"
         po_result = execute_query_via_cloudflare(po_query, [data['po_number']])
         
@@ -577,7 +588,6 @@ def receive_goods():
         total_quantity = sum(item['quantity'] for item in items)
         total_cost = sum(item['quantity'] * item['unit_cost'] for item in items)
         
-        # Create goods receipt
         receipt_query = """
             INSERT INTO erp_goods_receipts (
                 receipt_number, po_id, supplier_id, receipt_date,
@@ -610,13 +620,11 @@ def receive_goods():
             )
             execute_command_via_cloudflare(line_query, line_params)
             
-            # Update stock
             update_stock_query = """
                 UPDATE erp_products SET current_stock = current_stock + ? WHERE id = ?
             """
             execute_command_via_cloudflare(update_stock_query, (item['quantity'], item['product_id']))
         
-        # Update PO status
         update_po_query = """
             UPDATE erp_purchase_orders 
             SET status = 'Partially Received'
