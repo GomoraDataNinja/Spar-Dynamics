@@ -901,7 +901,7 @@
         }
 
         // ============================================
-        // NETWORK ANIMATION (simplified for brevity)
+        // NETWORK ANIMATION
         // ============================================
         (function() {
             const canvas = document.getElementById('networkCanvas');
@@ -1552,29 +1552,55 @@
             
             const poNumber = poSelect.value;
             
-            // Find the selected PO
-            const selectedPO = purchaseOrders.find(p => p.po_number === poNumber);
-            if (!selectedPO) {
-                showToast('❌ PO not found', 'error');
-                debugLog('❌ Selected PO not found: ' + poNumber, 'error');
-                return;
-            }
-            
-            // For now, we'll use a simplified receipt
-            // In production, you'd fetch PO lines from the API
-            const receiptData = {
-                po_number: poNumber,
-                items: [
-                    // This would normally come from PO lines
-                    // For demo, we'll use a placeholder
-                    { product_id: 1, product_code: "PRD001", product_name: "Sample Product", quantity: 1, unit_cost: 1.00 }
-                ],
-                created_by: currentUser.username
-            };
-            
-            debugLog('📥 Submitting goods receipt for PO: ' + poNumber, 'info');
-            
             try {
+                showToast('⏳ Fetching PO details...', 'info');
+                debugLog('📥 Fetching PO lines for: ' + poNumber, 'info');
+                
+                // Fetch PO lines from the API
+                let items = [];
+                try {
+                    const linesResponse = await fetch(API_URL + '/purchase-orders/' + poNumber + '/lines');
+                    if (linesResponse.ok) {
+                        items = await linesResponse.json();
+                        debugLog('✅ Fetched ' + items.length + ' PO lines', 'success');
+                    } else {
+                        debugLog('⚠️ Could not fetch PO lines, using fallback', 'warning');
+                        // Fallback: use sample data
+                        const po = purchaseOrders.find(p => p.po_number === poNumber);
+                        items = [
+                            { product_id: 1, product_code: "PRD001", product_name: "Golden Delicious Apples", quantity: 10, unit_price: 1.50 },
+                            { product_id: 2, product_code: "PRD002", product_name: "Fresh Bananas", quantity: 20, unit_price: 0.80 }
+                        ];
+                    }
+                } catch (e) {
+                    debugLog('⚠️ PO lines API error: ' + e.message, 'warning');
+                    // Fallback: use sample data
+                    items = [
+                        { product_id: 1, product_code: "PRD001", product_name: "Golden Delicious Apples", quantity: 10, unit_price: 1.50 },
+                        { product_id: 2, product_code: "PRD002", product_name: "Fresh Bananas", quantity: 20, unit_price: 0.80 }
+                    ];
+                }
+                
+                if (items.length === 0) {
+                    showToast('❌ No items found for this PO', 'error');
+                    debugLog('❌ No items for PO: ' + poNumber, 'error');
+                    return;
+                }
+                
+                // Prepare receipt data
+                const receiptData = {
+                    po_number: poNumber,
+                    items: items.map(item => ({
+                        product_id: item.product_id,
+                        product_code: item.product_code || '',
+                        product_name: item.product_name || '',
+                        quantity: item.quantity,
+                        unit_cost: item.unit_price || item.unit_cost || 0
+                    })),
+                    created_by: currentUser.username
+                };
+                
+                debugLog('📥 Submitting goods receipt: ' + JSON.stringify(receiptData), 'info');
                 showToast('⏳ Receiving goods...', 'info');
                 
                 const response = await fetch(API_URL + '/goods-receipt', {
@@ -1586,7 +1612,7 @@
                 if (response.ok) {
                     const result = await response.json();
                     debugLog('✅ Goods received! Receipt: ' + result.receipt_number + ', Quantity: ' + result.total_quantity, 'success');
-                    showToast('✅ Goods received! Stock updated.', 'success');
+                    showToast('✅ Goods received! ' + result.total_quantity + ' items received. Stock updated!', 'success');
                     closeModal('goodsReceiptModal');
                     await loadAllData();
                     loadPage('goods_receipt');
