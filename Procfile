@@ -1,0 +1,1 @@
+web: gunicorn spar_etl_receiver:app
