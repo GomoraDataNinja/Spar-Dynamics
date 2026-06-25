@@ -1,6 +1,5 @@
 """
 SPAR ETL Receiver - Render Version with Complete API
-Fully aligned with your database structure
 """
 from flask import Flask, request, jsonify, send_from_directory
 from datetime import datetime, timedelta
@@ -368,23 +367,7 @@ def create_sales_order():
         
         order_id = result.get('id', 0)
         
-        # Insert order lines
-        for i, item in enumerate(items):
-            line_query = """
-                INSERT INTO erp_sales_order_lines (
-                    so_id, line_number, product_id, product_code, product_name,
-                    quantity, unit_price, line_total
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """
-            line_params = (
-                order_id, i + 1, item['product_id'], 
-                item.get('product_code', ''), item.get('product_name', ''),
-                item['quantity'], item['unit_price'],
-                item['quantity'] * item['unit_price']
-            )
-            execute_command_via_cloudflare(line_query, line_params)
-            
-            # Update stock
+        for item in items:
             update_stock_query = "UPDATE erp_products SET current_stock = current_stock - ? WHERE id = ?"
             execute_command_via_cloudflare(update_stock_query, (item['quantity'], item['product_id']))
         
@@ -463,7 +446,7 @@ def get_purchase_order_lines(po_number):
         po_id = po_result[0]['id']
         logger.info(f"✅ Found PO ID: {po_id}")
         
-        # Get lines for this PO - aligned with your table structure
+        # Get lines for this PO
         query = """
             SELECT 
                 pol.product_id,
@@ -497,7 +480,9 @@ def create_purchase_order():
     """Create a new purchase order with line items"""
     try:
         data = request.json
-        logger.info(f"📦 Creating purchase order for: {data.get('supplier_name')}")
+        logger.info("=" * 70)
+        logger.info("📦 CREATING PURCHASE ORDER")
+        logger.info(f"📦 Supplier: {data.get('supplier_name')}")
         logger.info(f"📦 Items received: {data.get('items')}")
         
         po_number = 'PO-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
@@ -551,12 +536,18 @@ def create_purchase_order():
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         po_params = (
-            po_number, supplier_id,
+            po_number, 
+            supplier_id,
             datetime.now().strftime('%Y-%m-%d'),
             data.get('expected_delivery_date'),
-            subtotal, tax, total,
-            'Draft', data.get('created_by', 'system')
+            subtotal, 
+            tax, 
+            total,
+            'Draft', 
+            data.get('created_by', 'system')
         )
+        
+        logger.info(f"📝 Inserting PO with params: {po_params}")
         result = execute_command_via_cloudflare(insert_po_query, po_params)
         
         if not result.get('success', False):
@@ -566,31 +557,46 @@ def create_purchase_order():
         po_id = result.get('id', 0)
         logger.info(f"✅ PO created with ID: {po_id}")
         
-        # Insert each order line - aligned with your table structure
+        if po_id == 0 or po_id is None:
+            logger.error("❌ Failed to get PO ID")
+            return jsonify({"error": "Failed to get PO ID"}), 500
+        
+        # Insert each order line
+        lines_inserted = 0
         for i, item in enumerate(items):
-            line_query = """
-                INSERT INTO erp_purchase_order_lines (
-                    po_id, line_number, product_id, product_code, product_name,
-                    quantity, unit_price, line_total,
-                    expected_date, received_quantity, remaining_quantity
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
-            line_params = (
-                po_id, 
-                i + 1, 
-                item.get('product_id'),
-                item.get('product_code', ''),
-                item.get('product_name', ''),
-                item.get('quantity'),
-                item.get('unit_price'),
-                item.get('quantity') * item.get('unit_price'),
-                data.get('expected_delivery_date'),
-                0,  # received_quantity - initially 0
-                item.get('quantity')  # remaining_quantity - initially full quantity
-            )
-            logger.info(f"📝 Inserting line {i+1}: {item.get('product_name')} x {item.get('quantity')}")
-            line_result = execute_command_via_cloudflare(line_query, line_params)
-            logger.info(f"✅ Line {i+1} result: {line_result}")
+            try:
+                line_query = """
+                    INSERT INTO erp_purchase_order_lines (
+                        po_id, line_number, product_id, product_code, product_name,
+                        quantity, unit_price, line_total,
+                        expected_date, received_quantity, remaining_quantity
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                line_params = (
+                    po_id,  # CRITICAL: This must be the PO ID from the insert above
+                    i + 1, 
+                    item.get('product_id'),
+                    item.get('product_code', ''),
+                    item.get('product_name', ''),
+                    item.get('quantity'),
+                    item.get('unit_price'),
+                    item.get('quantity') * item.get('unit_price'),
+                    data.get('expected_delivery_date'),
+                    0,  # received_quantity - initially 0
+                    item.get('quantity')  # remaining_quantity - initially full quantity
+                )
+                logger.info(f"📝 Inserting line {i+1}: {item.get('product_name')} x {item.get('quantity')} with po_id={po_id}")
+                logger.info(f"📝 Line params: {line_params}")
+                line_result = execute_command_via_cloudflare(line_query, line_params)
+                logger.info(f"✅ Line {i+1} result: {line_result}")
+                if line_result.get('success', False):
+                    lines_inserted += 1
+                else:
+                    logger.error(f"❌ Line {i+1} insert failed: {line_result}")
+            except Exception as e:
+                logger.error(f"❌ Error inserting line {i+1}: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Verify lines were inserted
         verify_query = "SELECT COUNT(*) as count FROM erp_purchase_order_lines WHERE po_id = ?"
@@ -598,11 +604,20 @@ def create_purchase_order():
         line_count = verify_result[0]['count'] if verify_result else 0
         logger.info(f"✅ Verification: {line_count} lines inserted for PO {po_number}")
         
+        # Also verify the PO exists
+        po_verify = "SELECT id, po_number FROM erp_purchase_orders WHERE id = ?"
+        po_verify_result = execute_query_via_cloudflare(po_verify, [po_id])
+        logger.info(f"✅ PO verification: {po_verify_result}")
+        
+        logger.info(f"📦 PO creation completed: {po_number}")
+        logger.info("=" * 70)
+        
         return jsonify({
             "status": "success",
             "po_number": po_number,
             "total_amount": total,
-            "lines_inserted": line_count
+            "lines_inserted": line_count,
+            "po_id": po_id
         }), 200
         
     except Exception as e:
@@ -612,7 +627,7 @@ def create_purchase_order():
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# GOODS RECEIPT ENDPOINT - POST (FIXED)
+# GOODS RECEIPT ENDPOINT - POST
 # ============================================
 
 @app.route('/goods-receipt', methods=['POST'])
@@ -667,7 +682,7 @@ def receive_goods():
         
         receipt_id = result.get('id', 0)
         
-        # Process each item - UPDATE STOCK and PO lines
+        # Process each item - UPDATE STOCK
         for i, item in enumerate(items):
             # Insert receipt line
             line_query = """
