@@ -1,5 +1,6 @@
 """
-SPAR ETL Receiver - Render Version with Complete API
+SPAR ETL Receiver - Render Version
+Complete API with Products, Sales, Purchase Orders, and Goods Receiving
 """
 from flask import Flask, request, jsonify, send_from_directory
 from datetime import datetime, timedelta
@@ -95,8 +96,7 @@ def execute_query_via_cloudflare(query, params=None):
             timeout=60
         )
         if response.status_code == 200:
-            result = response.json()
-            return result
+            return response.json()
         logger.error(f"Cloudflare query error: {response.status_code}")
         return []
     except Exception as e:
@@ -115,8 +115,7 @@ def execute_command_via_cloudflare(query, params=None):
             timeout=60
         )
         if response.status_code == 200:
-            result = response.json()
-            return result
+            return response.json()
         logger.error(f"Cloudflare command error: {response.status_code}")
         return {"success": False, "error": f"Status {response.status_code}"}
     except Exception as e:
@@ -467,7 +466,7 @@ def get_purchase_order_lines(po_number):
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# PURCHASE ORDERS ENDPOINT - POST (FIXED)
+# PURCHASE ORDERS ENDPOINT - POST
 # ============================================
 
 @app.route('/purchase-orders', methods=['POST'])
@@ -628,7 +627,7 @@ def create_purchase_order():
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# GOODS RECEIPT ENDPOINT - POST (FIXED)
+# GOODS RECEIPT ENDPOINT - POST
 # ============================================
 
 @app.route('/goods-receipt', methods=['POST'])
@@ -725,7 +724,7 @@ def receive_goods():
                 item['product_id']
             ))
             
-            # CRITICAL: Update stock - ADD to current_stock (FIXED: ensure float values)
+            # CRITICAL: Update stock - ADD to current_stock
             update_stock_query = """
                 UPDATE erp_products 
                 SET current_stock = ISNULL(current_stock, 0) + ? 
