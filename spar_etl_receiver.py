@@ -472,7 +472,7 @@ def get_purchase_order_lines(po_number):
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# PURCHASE ORDERS ENDPOINT - POST (FIXED)
+# PURCHASE ORDERS ENDPOINT - POST (FIXED - SIMPLIFIED)
 # ============================================
 
 @app.route('/purchase-orders', methods=['POST'])
@@ -483,11 +483,14 @@ def create_purchase_order():
         logger.info("=" * 70)
         logger.info("📦 CREATING PURCHASE ORDER")
         logger.info(f"📦 Supplier: {data.get('supplier_name')}")
-        logger.info(f"📦 Items received: {data.get('items')}")
         
         po_number = 'PO-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
-        
         items = data.get('items', [])
+        
+        logger.info(f"📦 Items count: {len(items)}")
+        for idx, item in enumerate(items):
+            logger.info(f"   Item {idx+1}: {item.get('product_name')} x {item.get('quantity')}")
+        
         subtotal = sum(item['quantity'] * item['unit_price'] for item in items)
         tax = subtotal * 0.155
         total = subtotal + tax
@@ -527,7 +530,7 @@ def create_purchase_order():
             supplier_id = supplier_result[0]['id'] if supplier_result else None
             logger.info(f"✅ Created new supplier: {supplier_name} (ID: {supplier_id})")
         
-        # Insert purchase order
+        # Insert purchase order - use a simpler approach
         insert_po_query = """
             INSERT INTO erp_purchase_orders (
                 po_number, supplier_id, order_date,
@@ -536,35 +539,48 @@ def create_purchase_order():
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         po_params = (
-            po_number, 
-            supplier_id,
+            po_number, supplier_id,
             datetime.now().strftime('%Y-%m-%d'),
             data.get('expected_delivery_date'),
-            subtotal, 
-            tax, 
-            total,
-            'Draft', 
-            data.get('created_by', 'system')
+            subtotal, tax, total,
+            'Draft', data.get('created_by', 'system')
         )
         
-        logger.info(f"📝 Inserting PO with params: {po_params}")
+        logger.info(f"📝 Inserting PO with number: {po_number}")
         result = execute_command_via_cloudflare(insert_po_query, po_params)
         
         if not result.get('success', False):
             logger.error(f"❌ Failed to create PO: {result}")
             return jsonify({"error": "Failed to create purchase order"}), 500
         
-        po_id = result.get('id', 0)
-        logger.info(f"✅ PO created with ID: {po_id}")
+        # Get the PO ID by querying for it using the PO number
+        get_po_id_query = "SELECT id FROM erp_purchase_orders WHERE po_number = ?"
+        po_result = execute_query_via_cloudflare(get_po_id_query, [po_number])
         
-        if po_id == 0 or po_id is None:
-            logger.error("❌ Failed to get PO ID")
-            return jsonify({"error": "Failed to get PO ID"}), 500
+        if not po_result:
+            logger.error(f"❌ PO not found after insert: {po_number}")
+            # Try one more time with a slight delay
+            import time
+            time.sleep(1)
+            po_result = execute_query_via_cloudflare(get_po_id_query, [po_number])
+            if not po_result:
+                return jsonify({"error": "Failed to retrieve PO ID"}), 500
+        
+        po_id = po_result[0]['id']
+        logger.info(f"✅ PO created with ID: {po_id}")
         
         # Insert each order line
         lines_inserted = 0
         for i, item in enumerate(items):
             try:
+                # Get product details if not provided
+                if not item.get('product_code') or not item.get('product_name'):
+                    product_query = "SELECT product_code, product_name FROM erp_products WHERE id = ?"
+                    product_result = execute_query_via_cloudflare(product_query, [item.get('product_id')])
+                    if product_result:
+                        item['product_code'] = product_result[0].get('product_code', '')
+                        item['product_name'] = product_result[0].get('product_name', '')
+                
                 line_query = """
                     INSERT INTO erp_purchase_order_lines (
                         po_id, line_number, product_id, product_code, product_name,
@@ -573,7 +589,7 @@ def create_purchase_order():
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 line_params = (
-                    po_id,  # CRITICAL: This must be the PO ID from the insert above
+                    po_id,
                     i + 1, 
                     item.get('product_id'),
                     item.get('product_code', ''),
@@ -582,11 +598,10 @@ def create_purchase_order():
                     item.get('unit_price'),
                     item.get('quantity') * item.get('unit_price'),
                     data.get('expected_delivery_date'),
-                    0,  # received_quantity - initially 0
-                    item.get('quantity')  # remaining_quantity - initially full quantity
+                    0,
+                    item.get('quantity')
                 )
-                logger.info(f"📝 Inserting line {i+1}: {item.get('product_name')} x {item.get('quantity')} with po_id={po_id}")
-                logger.info(f"📝 Line params: {line_params}")
+                logger.info(f"📝 Inserting line {i+1}: {item.get('product_name')} x {item.get('quantity')}")
                 line_result = execute_command_via_cloudflare(line_query, line_params)
                 logger.info(f"✅ Line {i+1} result: {line_result}")
                 if line_result.get('success', False):
@@ -595,19 +610,12 @@ def create_purchase_order():
                     logger.error(f"❌ Line {i+1} insert failed: {line_result}")
             except Exception as e:
                 logger.error(f"❌ Error inserting line {i+1}: {e}")
-                import traceback
-                traceback.print_exc()
         
         # Verify lines were inserted
         verify_query = "SELECT COUNT(*) as count FROM erp_purchase_order_lines WHERE po_id = ?"
         verify_result = execute_query_via_cloudflare(verify_query, [po_id])
         line_count = verify_result[0]['count'] if verify_result else 0
         logger.info(f"✅ Verification: {line_count} lines inserted for PO {po_number}")
-        
-        # Also verify the PO exists
-        po_verify = "SELECT id, po_number FROM erp_purchase_orders WHERE id = ?"
-        po_verify_result = execute_query_via_cloudflare(po_verify, [po_id])
-        logger.info(f"✅ PO verification: {po_verify_result}")
         
         logger.info(f"📦 PO creation completed: {po_number}")
         logger.info("=" * 70)
@@ -627,7 +635,7 @@ def create_purchase_order():
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# GOODS RECEIPT ENDPOINT - POST
+# GOODS RECEIPT ENDPOINT - POST (FIXED)
 # ============================================
 
 @app.route('/goods-receipt', methods=['POST'])
@@ -652,6 +660,7 @@ def receive_goods():
         po_result = execute_query_via_cloudflare(po_query, [data['po_number']])
         
         if not po_result:
+            logger.error(f"❌ PO not found: {data['po_number']}")
             return jsonify({"error": "Purchase order not found"}), 404
         
         po = po_result[0]
@@ -659,6 +668,10 @@ def receive_goods():
         
         if not items:
             return jsonify({"error": "No items to receive"}), 400
+        
+        logger.info(f"📦 Receiving {len(items)} items")
+        for item in items:
+            logger.info(f"   {item.get('product_name')} x {item.get('quantity')}")
         
         total_quantity = sum(item['quantity'] for item in items)
         total_cost = sum(item['quantity'] * item['unit_cost'] for item in items)
@@ -749,8 +762,8 @@ def get_recent_sales():
     """Get recent sales"""
     try:
         sample_sales = [
-            {"sale_id": "SPAR-20260624-1001", "customer_name": "John Doe", "total_sales": 45.50, "sale_date": "2026-06-24", "sale_time": "10:30:00", "recorded_by": "admin", "etl_processed": 1},
-            {"sale_id": "SPAR-20260624-1002", "customer_name": "Jane Smith", "total_sales": 67.25, "sale_date": "2026-06-24", "sale_time": "11:15:00", "recorded_by": "operator1", "etl_processed": 1}
+            {"sale_id": "SO-20260625-1001", "customer_name": "John Doe", "total_sales": 45.50, "sale_date": "2026-06-25", "sale_time": "10:30:00", "recorded_by": "admin", "etl_processed": 1},
+            {"sale_id": "SO-20260625-1002", "customer_name": "Jane Smith", "total_sales": 67.25, "sale_date": "2026-06-25", "sale_time": "11:15:00", "recorded_by": "operator1", "etl_processed": 1}
         ]
         
         if not CLOUDFLARE_API_URL:
@@ -769,7 +782,6 @@ def get_recent_sales():
                 1 as etl_processed
             FROM erp_sales_orders so
             LEFT JOIN erp_customers c ON so.customer_id = c.id
-            WHERE so.order_date = CAST(GETDATE() AS DATE)
             ORDER BY so.created_at DESC
         """
         result = execute_query_via_cloudflare(query)
