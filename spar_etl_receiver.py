@@ -89,7 +89,6 @@ def execute_query_via_cloudflare(query, params=None):
         logger.warning("⚠️ CLOUDFLARE_API_URL not configured")
         return []
     try:
-        logger.info(f"📊 Query: {query[:100]}...")
         response = requests.post(
             f"{CLOUDFLARE_API_URL}/execute-query",
             json={"query": query, "params": params or []},
@@ -97,9 +96,8 @@ def execute_query_via_cloudflare(query, params=None):
         )
         if response.status_code == 200:
             result = response.json()
-            logger.info(f"✅ Query returned {len(result)} rows")
             return result
-        logger.error(f"Cloudflare query error: {response.status_code} - {response.text}")
+        logger.error(f"Cloudflare query error: {response.status_code}")
         return []
     except Exception as e:
         logger.error(f"Cloudflare query exception: {e}")
@@ -111,8 +109,6 @@ def execute_command_via_cloudflare(query, params=None):
         logger.warning("⚠️ CLOUDFLARE_API_URL not configured")
         return {"success": False, "error": "CLOUDFLARE_API_URL not configured"}
     try:
-        logger.info(f"📝 Command: {query[:100]}...")
-        logger.info(f"📝 Params: {params}")
         response = requests.post(
             f"{CLOUDFLARE_API_URL}/execute-command",
             json={"query": query, "params": params or []},
@@ -120,9 +116,8 @@ def execute_command_via_cloudflare(query, params=None):
         )
         if response.status_code == 200:
             result = response.json()
-            logger.info(f"✅ Command executed: {result}")
             return result
-        logger.error(f"Cloudflare command error: {response.status_code} - {response.text}")
+        logger.error(f"Cloudflare command error: {response.status_code}")
         return {"success": False, "error": f"Status {response.status_code}"}
     except Exception as e:
         logger.error(f"Cloudflare command exception: {e}")
@@ -472,7 +467,7 @@ def get_purchase_order_lines(po_number):
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# PURCHASE ORDERS ENDPOINT - POST (FIXED - SIMPLIFIED)
+# PURCHASE ORDERS ENDPOINT - POST (FIXED)
 # ============================================
 
 @app.route('/purchase-orders', methods=['POST'])
@@ -530,7 +525,7 @@ def create_purchase_order():
             supplier_id = supplier_result[0]['id'] if supplier_result else None
             logger.info(f"✅ Created new supplier: {supplier_name} (ID: {supplier_id})")
         
-        # Insert purchase order - use a simpler approach
+        # Insert purchase order
         insert_po_query = """
             INSERT INTO erp_purchase_orders (
                 po_number, supplier_id, order_date,
@@ -542,8 +537,11 @@ def create_purchase_order():
             po_number, supplier_id,
             datetime.now().strftime('%Y-%m-%d'),
             data.get('expected_delivery_date'),
-            subtotal, tax, total,
-            'Draft', data.get('created_by', 'system')
+            float(subtotal), 
+            float(tax), 
+            float(total),
+            'Draft', 
+            data.get('created_by', 'system')
         )
         
         logger.info(f"📝 Inserting PO with number: {po_number}")
@@ -559,12 +557,7 @@ def create_purchase_order():
         
         if not po_result:
             logger.error(f"❌ PO not found after insert: {po_number}")
-            # Try one more time with a slight delay
-            import time
-            time.sleep(1)
-            po_result = execute_query_via_cloudflare(get_po_id_query, [po_number])
-            if not po_result:
-                return jsonify({"error": "Failed to retrieve PO ID"}), 500
+            return jsonify({"error": "Failed to retrieve PO ID"}), 500
         
         po_id = po_result[0]['id']
         logger.info(f"✅ PO created with ID: {po_id}")
@@ -592,14 +585,14 @@ def create_purchase_order():
                     po_id,
                     i + 1, 
                     item.get('product_id'),
-                    item.get('product_code', ''),
-                    item.get('product_name', ''),
-                    item.get('quantity'),
-                    item.get('unit_price'),
-                    item.get('quantity') * item.get('unit_price'),
+                    str(item.get('product_code', '')),
+                    str(item.get('product_name', '')),
+                    float(item.get('quantity', 0)),
+                    float(item.get('unit_price', 0)),
+                    float(item.get('quantity', 0)) * float(item.get('unit_price', 0)),
                     data.get('expected_delivery_date'),
                     0,
-                    item.get('quantity')
+                    float(item.get('quantity', 0))
                 )
                 logger.info(f"📝 Inserting line {i+1}: {item.get('product_name')} x {item.get('quantity')}")
                 line_result = execute_command_via_cloudflare(line_query, line_params)
@@ -673,8 +666,8 @@ def receive_goods():
         for item in items:
             logger.info(f"   {item.get('product_name')} x {item.get('quantity')}")
         
-        total_quantity = sum(item['quantity'] for item in items)
-        total_cost = sum(item['quantity'] * item['unit_cost'] for item in items)
+        total_quantity = sum(float(item['quantity']) for item in items)
+        total_cost = sum(float(item['quantity']) * float(item['unit_cost']) for item in items)
         
         # Create goods receipt
         receipt_query = """
@@ -686,7 +679,10 @@ def receive_goods():
         receipt_params = (
             receipt_number, po['id'], po['supplier_id'],
             datetime.now().strftime('%Y-%m-%d'),
-            total_quantity, total_cost, 'Completed', data.get('created_by', 'system')
+            float(total_quantity), 
+            float(total_cost), 
+            'Completed', 
+            data.get('created_by', 'system')
         )
         result = execute_command_via_cloudflare(receipt_query, receipt_params)
         
@@ -705,31 +701,41 @@ def receive_goods():
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """
             line_params = (
-                receipt_id, i + 1, item['product_id'], item.get('product_code', ''),
-                item.get('product_name', ''), item['quantity'],
-                item['unit_cost'], item['quantity'] * item['unit_cost']
+                receipt_id, 
+                i + 1, 
+                item['product_id'], 
+                str(item.get('product_code', '')),
+                str(item.get('product_name', '')),
+                float(item['quantity']),
+                float(item['unit_cost']),
+                float(item['quantity']) * float(item['unit_cost'])
             )
             execute_command_via_cloudflare(line_query, line_params)
             
             # Update PO line - mark as received
             update_po_line_query = """
                 UPDATE erp_purchase_order_lines 
-                SET received_quantity = received_quantity + ?,
-                    remaining_quantity = quantity - received_quantity
+                SET received_quantity = ISNULL(received_quantity, 0) + ?,
+                    remaining_quantity = quantity - ISNULL(received_quantity, 0)
                 WHERE po_id = ? AND product_id = ?
             """
             execute_command_via_cloudflare(update_po_line_query, (
-                item['quantity'], po['id'], item['product_id']
+                float(item['quantity']), 
+                po['id'], 
+                item['product_id']
             ))
             
-            # CRITICAL: Update stock - ADD to current_stock
+            # CRITICAL: Update stock - ADD to current_stock (FIXED: ensure float values)
             update_stock_query = """
                 UPDATE erp_products 
                 SET current_stock = ISNULL(current_stock, 0) + ? 
                 WHERE id = ?
             """
-            result_stock = execute_command_via_cloudflare(update_stock_query, (item['quantity'], item['product_id']))
-            logger.info(f"📦 Stock updated for product {item['product_id']}: +{item['quantity']}")
+            result_stock = execute_command_via_cloudflare(update_stock_query, (
+                float(item['quantity']), 
+                item['product_id']
+            ))
+            logger.info(f"📦 Stock updated for product {item['product_id']}: +{float(item['quantity'])}")
         
         # Update PO status to Received
         update_po_query = """
