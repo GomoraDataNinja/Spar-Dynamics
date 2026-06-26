@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
+        /* ... (keep all your existing styles) ... */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: #202124; height: 100vh; overflow: hidden; }
         
@@ -454,7 +455,7 @@
     </div>
 
     <!-- ============================================
-    MODAL: New Sale
+    MODALS (All modals remain the same)
     ============================================ -->
     <div class="modal-overlay" id="salesOrderModal">
         <div class="modal">
@@ -462,7 +463,6 @@
                 <h2>🛒 New Sale</h2>
                 <button class="close-btn" onclick="closeModal('salesOrderModal')">×</button>
             </div>
-            
             <form id="salesOrderForm" onsubmit="submitSalesOrder(event)">
                 <div class="form-row">
                     <div class="form-group">
@@ -474,7 +474,6 @@
                         <input type="email" id="soCustomerEmail" placeholder="customer@example.com">
                     </div>
                 </div>
-                
                 <div style="margin: 1rem 0; padding: 0.5rem; background: #f8f9fa; border-radius: 8px;">
                     <h4 style="font-size: 0.85rem; color: #002B5C; margin-bottom: 0.5rem;">Order Items</h4>
                     <div id="soItemsContainer">
@@ -491,14 +490,12 @@
                         <i class="fas fa-plus"></i> Add Item
                     </button>
                 </div>
-                
                 <div class="order-summary">
                     <div class="row"><span>Subtotal:</span><span id="soSubtotal">$0.00</span></div>
                     <div class="row" style="font-size:0.85rem;color:#6B7280;"><span>VAT (15.5%):</span><span id="soTax">$0.00</span></div>
                     <div class="row total"><span>Total:</span><span id="soTotal">$0.00</span></div>
                     <div class="row" style="font-size:0.8rem;color:#6B7280;"><span>⭐ Rewards (2%):</span><span id="soRewards">0 pts</span></div>
                 </div>
-                
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('salesOrderModal')">Cancel</button>
                     <button type="submit" class="btn btn-success">💾 Record Sale</button>
@@ -507,16 +504,12 @@
         </div>
     </div>
 
-    <!-- ============================================
-    MODAL: New Purchase Order
-    ============================================ -->
     <div class="modal-overlay" id="poModal">
         <div class="modal">
             <div class="modal-header">
                 <h2>📦 New Purchase Order</h2>
                 <button class="close-btn" onclick="closeModal('poModal')">×</button>
             </div>
-            
             <form id="poForm" onsubmit="submitPurchaseOrder(event)">
                 <div class="form-row">
                     <div class="form-group">
@@ -528,12 +521,10 @@
                         <input type="email" id="poSupplierEmail" placeholder="supplier@example.com">
                     </div>
                 </div>
-                
                 <div class="form-group">
                     <label>Expected Delivery Date</label>
                     <input type="date" id="poExpectedDate">
                 </div>
-                
                 <div style="margin: 1rem 0; padding: 0.5rem; background: #f8f9fa; border-radius: 8px;">
                     <h4 style="font-size: 0.85rem; color: #002B5C; margin-bottom: 0.5rem;">Order Items</h4>
                     <div id="poItemsContainer">
@@ -550,13 +541,11 @@
                         <i class="fas fa-plus"></i> Add Item
                     </button>
                 </div>
-                
                 <div class="order-summary">
                     <div class="row"><span>Subtotal:</span><span id="poSubtotal">$0.00</span></div>
                     <div class="row" style="font-size:0.85rem;color:#6B7280;"><span>VAT (15.5%):</span><span id="poTax">$0.00</span></div>
                     <div class="row total"><span>Total:</span><span id="poTotal">$0.00</span></div>
                 </div>
-                
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('poModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">📦 Create PO</button>
@@ -565,16 +554,12 @@
         </div>
     </div>
 
-    <!-- ============================================
-    MODAL: Receive Goods
-    ============================================ -->
     <div class="modal-overlay" id="goodsReceiptModal">
         <div class="modal">
             <div class="modal-header">
                 <h2>📥 Receive Goods</h2>
                 <button class="close-btn" onclick="closeModal('goodsReceiptModal')">×</button>
             </div>
-            
             <form id="goodsReceiptForm" onsubmit="submitGoodsReceipt(event)">
                 <div class="form-group">
                     <label>Purchase Order</label>
@@ -582,9 +567,7 @@
                         <option value="">Select PO</option>
                     </select>
                 </div>
-                
                 <div id="grItemsContainer"></div>
-                
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('goodsReceiptModal')">Cancel</button>
                     <button type="submit" class="btn btn-success">📥 Receive Goods</button>
@@ -593,16 +576,12 @@
         </div>
     </div>
 
-    <!-- ============================================
-    MODAL: Add Product
-    ============================================ -->
     <div class="modal-overlay" id="productModal">
         <div class="modal">
             <div class="modal-header">
                 <h2>📦 Add New Product</h2>
                 <button class="close-btn" onclick="closeModal('productModal')">×</button>
             </div>
-            
             <form id="productForm" onsubmit="submitProduct(event)">
                 <div class="form-row">
                     <div class="form-group">
@@ -614,7 +593,6 @@
                         <input type="text" id="prodName" placeholder="Product name" required>
                     </div>
                 </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label>Category *</label>
@@ -645,7 +623,6 @@
                         </select>
                     </div>
                 </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label>Unit Price (USD)</label>
@@ -656,7 +633,6 @@
                         <input type="number" id="prodCost" value="0.00" min="0.01" step="0.01">
                     </div>
                 </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label>Initial Stock</label>
@@ -667,12 +643,10 @@
                         <input type="number" id="prodReorder" value="10" min="1">
                     </div>
                 </div>
-                
                 <div class="form-group">
                     <label>Description</label>
                     <input type="text" id="prodDesc" placeholder="Product description (optional)">
                 </div>
-                
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('productModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">💾 Add Product</button>
@@ -681,16 +655,12 @@
         </div>
     </div>
 
-    <!-- ============================================
-    MODAL: Add User
-    ============================================ -->
     <div class="modal-overlay" id="userModal">
         <div class="modal">
             <div class="modal-header">
                 <h2>👤 Add New User</h2>
                 <button class="close-btn" onclick="closeModal('userModal')">×</button>
             </div>
-            
             <form id="userForm" onsubmit="submitUser(event)">
                 <div class="form-row">
                     <div class="form-group">
@@ -702,7 +672,6 @@
                         <input type="text" id="userUsername" placeholder="johndoe" required>
                     </div>
                 </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label>Email *</label>
@@ -716,12 +685,10 @@
                         </select>
                     </div>
                 </div>
-                
                 <div class="form-group">
                     <label>Password *</label>
                     <input type="password" id="userPassword" placeholder="Min 6 characters" required minlength="6">
                 </div>
-                
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">👤 Create User</button>
@@ -1043,7 +1010,7 @@
         }
 
         // ============================================
-        // LOAD DATA
+        // LOAD DATA (NO HARDCODED DATA)
         // ============================================
         async function loadAllData() {
             debugLog('🔄 Loading all data...', 'info');
@@ -1063,7 +1030,7 @@
                 if (response.ok) {
                     const data = await response.json();
                     products = data || [];
-                    debugLog('✅ Loaded ' + products.length + ' products', 'success');
+                    debugLog('✅ Loaded ' + products.length + ' products from database', 'success');
                     if (document.getElementById('productList')) {
                         renderProducts(products);
                     }
@@ -1071,11 +1038,9 @@
                     updateProductMetrics();
                     return;
                 }
-                products = [
-                    { id: 1, product_code: 'PRD001', product_name: 'Golden Delicious Apples', category_name: 'Fresh Produce', unit_price: 2.99, current_stock: 45, available_stock: 45, reorder_level: 20, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' },
-                    { id: 2, product_code: 'PRD002', product_name: 'Fresh Bananas', category_name: 'Fresh Produce', unit_price: 1.49, current_stock: 60, available_stock: 60, reorder_level: 25, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' },
-                    { id: 3, product_code: 'PRD003', product_name: 'Beef Steak Rump', category_name: 'Meat & Poultry', unit_price: 12.99, current_stock: 18, available_stock: 18, reorder_level: 15, unit_of_measure: 'KG', stock_status: 'in-stock', stock_label: 'In Stock' }
-                ];
+                // NO HARDCODED DATA - just empty array
+                products = [];
+                debugLog('⚠️ No products found in database', 'warning');
                 if (document.getElementById('productList')) {
                     renderProducts(products);
                 }
@@ -1113,7 +1078,7 @@
                     salesOrders = data || [];
                     const badge = document.getElementById('orderBadge');
                     if (badge) badge.textContent = salesOrders.length;
-                    debugLog('✅ Loaded ' + salesOrders.length + ' sales orders', 'success');
+                    debugLog('✅ Loaded ' + salesOrders.length + ' sales orders from database', 'success');
                     return;
                 }
                 salesOrders = [];
@@ -1134,7 +1099,7 @@
                         const pending = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled');
                         badge.textContent = pending.length;
                     }
-                    debugLog('✅ Loaded ' + purchaseOrders.length + ' purchase orders', 'success');
+                    debugLog('✅ Loaded ' + purchaseOrders.length + ' purchase orders from database', 'success');
                     return;
                 }
                 purchaseOrders = [];
@@ -1150,7 +1115,7 @@
                 if (response.ok) {
                     const data = await response.json();
                     salesData = data || [];
-                    debugLog('✅ Loaded ' + salesData.length + ' recent sales', 'success');
+                    debugLog('✅ Loaded ' + salesData.length + ' recent sales from database', 'success');
                     if (salesData.length > 0) {
                         debugLog('📊 Sample sale: ' + JSON.stringify(salesData[0]), 'info');
                     }
@@ -1160,6 +1125,7 @@
                 }
                 salesData = [];
                 updateSalesBadge();
+                debugLog('⚠️ No sales found in database', 'warning');
             } catch (error) {
                 debugLog('❌ Error loading sales data: ' + error.message, 'error');
                 salesData = [];
@@ -1173,14 +1139,13 @@
             if (!dateStr) return false;
             const d = new Date(dateStr);
             const now = new Date();
-            // Reset time to midnight for comparison
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const diff = (today - d) / (1000 * 60 * 60 * 24); // difference in days
+            const diff = (today - d) / (1000 * 60 * 60 * 24);
             return diff >= 0 && diff <= 7;
         }
 
         // ============================================
-        // UPDATE DASHBOARD METRICS (last 7 days)
+        // UPDATE DASHBOARD METRICS
         // ============================================
         function updateDashboardMetrics() {
             let recentSales = salesData.filter(s => {
@@ -1648,7 +1613,7 @@
             const container = document.getElementById('productList');
             if (!container) return;
             if (!productList || productList.length === 0) {
-                container.innerHTML = `<div style="text-align:center;padding:2rem;color:#6B7280;"><i class="fas fa-box-open" style="font-size:2rem;display:block;margin-bottom:0.5rem;"></i>No products found.</div>`;
+                container.innerHTML = `<div style="text-align:center;padding:2rem;color:#6B7280;"><i class="fas fa-box-open" style="font-size:2rem;display:block;margin-bottom:0.5rem;"></i>No products found in database.</div>`;
                 return;
             }
             let html = '<div class="product-grid">';
@@ -1696,7 +1661,7 @@
         }
 
         // ============================================
-        // UPDATE BADGES (last 7 days)
+        // UPDATE BADGES
         // ============================================
         function updateSalesBadge() {
             const badge = document.getElementById('salesBadge');
@@ -1820,7 +1785,7 @@
         }
 
         // ============================================
-        // PAGE: DASHBOARD (last 7 days)
+        // PAGE: DASHBOARD
         // ============================================
         function showDashboard(container) {
             if (!container) return;
@@ -2365,7 +2330,7 @@
         debugLog('📡 API URL: ' + API_URL, 'info');
         debugLog('🔑 Default: admin / Admin@123', 'info');
         debugLog('🔄 Auto-refresh enabled every 15 seconds', 'info');
-        debugLog('📊 Showing sales from the last 7 days', 'info');
+        debugLog('📊 Showing sales from the last 7 days (from database only)', 'info');
         
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
         console.log('📡 API URL:', API_URL);
