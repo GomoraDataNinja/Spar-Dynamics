@@ -432,35 +432,7 @@
                 </span>
             </div>
             
-            <!-- QUICK ACTIONS -->
-            <div class="quick-actions">
-                <div class="quick-action" onclick="openModal('salesOrderModal')">
-                    <i class="fas fa-shopping-cart"></i>
-                    <span class="label">New Sale</span>
-                </div>
-                <div class="quick-action" onclick="openModal('poModal')">
-                    <i class="fas fa-truck"></i>
-                    <span class="label">New PO</span>
-                </div>
-                <div class="quick-action" onclick="loadPage('goods_receipt')">
-                    <i class="fas fa-warehouse"></i>
-                    <span class="label">Receive Goods</span>
-                </div>
-                <div class="quick-action" onclick="loadPage('products')">
-                    <i class="fas fa-boxes"></i>
-                    <span class="label">Products</span>
-                </div>
-                <div class="quick-action" onclick="openModal('productModal')">
-                    <i class="fas fa-plus-circle"></i>
-                    <span class="label">Add Product</span>
-                </div>
-                <div class="quick-action" onclick="loadPage('my_sales')">
-                    <i class="fas fa-user-tie"></i>
-                    <span class="label">My Sales</span>
-                </div>
-            </div>
-            
-            <!-- Content Container -->
+            <!-- Content Container (dashboard and other pages will be injected here) -->
             <div id="contentContainer">
                 <!-- Dynamic content loaded here -->
             </div>
@@ -1196,10 +1168,10 @@
         }
 
         // ============================================
-        // UPDATE DASHBOARD METRICS
+        // UPDATE DASHBOARD METRICS (with local date)
         // ============================================
         function updateDashboardMetrics() {
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA');
             let todaySales = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
                 return saleDate === today;
@@ -1211,7 +1183,6 @@
             const badge = document.getElementById('salesBadge');
             if (badge) badge.textContent = todaySales.length;
             
-            // Update the dashboard display if the elements exist
             const revenueEl = document.getElementById('todayRevenue');
             const transactionsEl = document.getElementById('todayTransactions');
             if (revenueEl) revenueEl.textContent = formatCurrency(revenue);
@@ -1716,12 +1687,12 @@
         }
 
         // ============================================
-        // UPDATE BADGES
+        // UPDATE BADGES (with local date)
         // ============================================
         function updateSalesBadge() {
             const badge = document.getElementById('salesBadge');
             if (!badge) return;
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA');
             let todaySales = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
                 return saleDate === today;
@@ -1841,7 +1812,7 @@
         }
 
         // ============================================
-        // PAGE: DASHBOARD
+        // PAGE: DASHBOARD (with local date)
         // ============================================
         function showDashboard(container) {
             if (!container) return;
@@ -1853,7 +1824,7 @@
                 return status === 'low-stock' || status === 'out-of-stock';
             }).length;
             
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA');
             let todaySales = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
                 return saleDate === today;
@@ -1897,8 +1868,9 @@
             const now = new Date();
             const maxVal = Math.max(1, ...salesData.map(s => parseFloat(s.total_sales || 0)));
             for (let i = 6; i >= 0; i--) {
-                const d = new Date(now); d.setDate(d.getDate() - i);
-                const dateStr = d.toISOString().split('T')[0];
+                const d = new Date(now);
+                d.setDate(d.getDate() - i);
+                const dateStr = d.toLocaleDateString('en-CA');
                 let daySales = salesData.filter(s => {
                     const saleDate = s.sale_date || s.order_date;
                     return saleDate === dateStr;
@@ -1914,7 +1886,7 @@
         }
 
         function getRecentOrders() {
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA');
             let recent = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
                 return saleDate === today;
@@ -1981,7 +1953,7 @@
         // ============================================
         function showMySales(container) {
             if (!container) return;
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA');
             let userSales = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
                 return saleDate === today;
@@ -2178,7 +2150,7 @@
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Users</div><div style="font-weight:600;">${users.length}</div></div>
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Today's Sales</div><div style="font-weight:600;">${salesData.filter(s => {
                             const saleDate = s.sale_date || s.order_date;
-                            return saleDate === new Date().toISOString().split('T')[0];
+                            return saleDate === new Date().toLocaleDateString('en-CA');
                         }).length}</div></div>
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Uptime</div><div style="font-weight:600;">${hours}h ${minutes}m</div></div>
                     </div></div></div>
