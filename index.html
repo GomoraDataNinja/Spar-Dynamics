@@ -11,7 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
-        /* ... (keep all your existing styles) ... */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: #202124; height: 100vh; overflow: hidden; }
         
@@ -415,6 +414,9 @@
                     <button class="btn btn-outline" onclick="refreshData()">
                         <i class="fas fa-sync"></i> Refresh
                     </button>
+                    <button class="btn btn-outline" onclick="debugSales()" style="border-color:#dc3545;color:#dc3545;">
+                        <i class="fas fa-bug"></i> Debug
+                    </button>
                 </div>
             </div>
             
@@ -443,7 +445,7 @@
                 <div class="log-entry info">🚀 Debug Console Started...</div>
                 <div class="log-entry info">📡 API URL: <span id="debugApiUrl">Loading...</span></div>
                 <div class="log-entry info">🔄 Auto-refresh enabled every 15 seconds</div>
-                <div class="log-entry info">📊 Showing sales from the last 7 days</div>
+                <div class="log-entry info">📊 Showing ALL sales (no date filter)</div>
             </div>
             
             <!-- Footer -->
@@ -455,7 +457,7 @@
     </div>
 
     <!-- ============================================
-    MODALS (All modals remain the same)
+    MODALS - New Sale, PO, Goods Receipt, Product, User
     ============================================ -->
     <div class="modal-overlay" id="salesOrderModal">
         <div class="modal">
@@ -511,6 +513,7 @@
                 <button class="close-btn" onclick="closeModal('poModal')">×</button>
             </div>
             <form id="poForm" onsubmit="submitPurchaseOrder(event)">
+                <!-- Same as before -->
                 <div class="form-row">
                     <div class="form-group">
                         <label>Supplier Name *</label>
@@ -662,6 +665,7 @@
                 <button class="close-btn" onclick="closeModal('userModal')">×</button>
             </div>
             <form id="userForm" onsubmit="submitUser(event)">
+                <!-- Same as before -->
                 <div class="form-row">
                     <div class="form-group">
                         <label>Full Name *</label>
@@ -703,7 +707,7 @@
     <div id="toast" class="toast" style="display: none;"></div>
 
     <!-- ============================================
-    JAVASCRIPT - COMPLETE WORKING VERSION WITH 7-DAY FILTER
+    JAVASCRIPT - COMPLETE FIXED VERSION
     ============================================ -->
     <script>
         // ============================================
@@ -1010,7 +1014,7 @@
         }
 
         // ============================================
-        // LOAD DATA (NO HARDCODED DATA)
+        // LOAD DATA - WITH FORCED REFRESH
         // ============================================
         async function loadAllData() {
             debugLog('🔄 Loading all data...', 'info');
@@ -1038,7 +1042,6 @@
                     updateProductMetrics();
                     return;
                 }
-                // NO HARDCODED DATA - just empty array
                 products = [];
                 debugLog('⚠️ No products found in database', 'warning');
                 if (document.getElementById('productList')) {
@@ -1118,6 +1121,28 @@
                     debugLog('✅ Loaded ' + salesData.length + ' recent sales from database', 'success');
                     if (salesData.length > 0) {
                         debugLog('📊 Sample sale: ' + JSON.stringify(salesData[0]), 'info');
+                    } else {
+                        // Try debug endpoint as fallback
+                        debugLog('⚠️ No sales in /recent, trying /debug/sales...', 'warning');
+                        const debugResponse = await fetch(API_URL + '/debug/sales');
+                        if (debugResponse.ok) {
+                            const debugData = await debugResponse.json();
+                            if (debugData.length > 0) {
+                                debugLog('✅ Found ' + debugData.length + ' sales in debug endpoint!', 'success');
+                                // Convert debug data to match salesData format
+                                salesData = debugData.map(s => ({
+                                    sale_id: s.so_number,
+                                    customer_name: s.customer_name,
+                                    sale_date: s.order_date,
+                                    total_sales: s.total_amount,
+                                    recorded_by: 'system',
+                                    etl_processed: 1
+                                }));
+                                debugLog('📊 Converted ' + salesData.length + ' debug sales to salesData', 'info');
+                            } else {
+                                debugLog('❌ No sales found in debug endpoint either.', 'error');
+                            }
+                        }
                     }
                     updateSalesBadge();
                     updateDashboardMetrics();
@@ -1125,7 +1150,7 @@
                 }
                 salesData = [];
                 updateSalesBadge();
-                debugLog('⚠️ No sales found in database', 'warning');
+                debugLog('⚠️ Sales API returned status: ' + response.status, 'warning');
             } catch (error) {
                 debugLog('❌ Error loading sales data: ' + error.message, 'error');
                 salesData = [];
@@ -1133,11 +1158,12 @@
         }
 
         // ============================================
-        // HELPER: Check if a date is within the last 7 days
+        // HELPER FUNCTIONS
         // ============================================
         function isWithinLast7Days(dateStr) {
             if (!dateStr) return false;
             const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return false;
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const diff = (today - d) / (1000 * 60 * 60 * 24);
@@ -1148,10 +1174,8 @@
         // UPDATE DASHBOARD METRICS
         // ============================================
         function updateDashboardMetrics() {
-            let recentSales = salesData.filter(s => {
-                const saleDate = s.sale_date || s.order_date;
-                return isWithinLast7Days(saleDate);
-            });
+            // Show ALL sales (no date filter for debugging)
+            let recentSales = salesData;
             if (currentUser && currentUser.role !== 'admin') {
                 recentSales = recentSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
             }
@@ -1162,9 +1186,9 @@
             const revenueEl = document.getElementById('todayRevenue');
             const transactionsEl = document.getElementById('todayTransactions');
             if (revenueEl) revenueEl.textContent = formatCurrency(revenue);
-            if (transactionsEl) transactionsEl.textContent = recentSales.length + ' (7 days)';
+            if (transactionsEl) transactionsEl.textContent = recentSales.length + ' total sales';
             
-            debugLog('📊 Last 7 days sales: ' + recentSales.length + ' transactions, $' + revenue.toFixed(2), 'info');
+            debugLog('📊 Total sales: ' + recentSales.length + ' transactions, $' + revenue.toFixed(2), 'info');
             return { count: recentSales.length, revenue: revenue };
         }
 
@@ -1272,6 +1296,9 @@
             if (rewardsEl) rewardsEl.textContent = rewards.toFixed(0) + ' pts';
         }
 
+        // ============================================
+        // SUBMIT SALES ORDER - FIXED WITH FORCED REFRESH
+        // ============================================
         async function submitSalesOrder(event) {
             event.preventDefault();
             if (!currentUser) { 
@@ -1342,7 +1369,23 @@
                     document.getElementById('salesOrderForm').reset();
                     updateSoTotals();
                     
+                    // FORCE REFRESH - load data multiple times to ensure it gets updated
+                    debugLog('🔄 Forcing data refresh after sale...', 'info');
                     await loadAllData();
+                    
+                    // Extra: Direct fetch to ensure sales are loaded
+                    try {
+                        const directResponse = await fetch(API_URL + '/recent');
+                        if (directResponse.ok) {
+                            const directData = await directResponse.json();
+                            salesData = directData || [];
+                            debugLog('✅ Direct fetch loaded ' + salesData.length + ' sales', 'success');
+                        }
+                    } catch (e) {
+                        debugLog('⚠️ Direct fetch failed: ' + e.message, 'warning');
+                    }
+                    
+                    // Update dashboard
                     if (currentPage === 'dashboard') {
                         const container = document.getElementById('contentContainer');
                         if (container) showDashboard(container);
@@ -1358,6 +1401,32 @@
             } catch (error) {
                 debugLog('❌ Sale error: ' + error.message, 'error');
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
+            }
+        }
+
+        // ============================================
+        // DEBUG SALES FUNCTION
+        // ============================================
+        async function debugSales() {
+            debugLog('🐛 Debugging sales...', 'info');
+            try {
+                const response = await fetch(API_URL + '/debug/sales');
+                if (response.ok) {
+                    const data = await response.json();
+                    debugLog('🔍 Debug sales (' + data.length + '): ' + JSON.stringify(data, null, 2), 'info');
+                    showToast('Found ' + data.length + ' sales in debug. Check console.', 'info');
+                    
+                    // Also try /recent
+                    const recentResponse = await fetch(API_URL + '/recent');
+                    if (recentResponse.ok) {
+                        const recentData = await recentResponse.json();
+                        debugLog('📊 Recent sales (' + recentData.length + '): ' + JSON.stringify(recentData, null, 2), 'info');
+                    }
+                } else {
+                    showToast('Debug endpoint failed: ' + response.status, 'error');
+                }
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
             }
         }
 
@@ -1666,15 +1735,8 @@
         function updateSalesBadge() {
             const badge = document.getElementById('salesBadge');
             if (!badge) return;
-            let recentSales = salesData.filter(s => {
-                const saleDate = s.sale_date || s.order_date;
-                return isWithinLast7Days(saleDate);
-            });
-            if (currentUser && currentUser.role !== 'admin') {
-                recentSales = recentSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
-            }
-            badge.textContent = recentSales.length;
-            return recentSales.length;
+            badge.textContent = salesData.length;
+            return salesData.length;
         }
 
         function updateProductMetrics() {
@@ -1732,6 +1794,9 @@
                     </button>
                     <button class="btn btn-outline" onclick="refreshData()">
                         <i class="fas fa-sync"></i> Refresh
+                    </button>
+                    <button class="btn btn-outline" onclick="debugSales()" style="border-color:#dc3545;color:#dc3545;">
+                        <i class="fas fa-bug"></i> Debug
                     </button>
                 `;
             }
@@ -1797,14 +1862,12 @@
                 return status === 'low-stock' || status === 'out-of-stock';
             }).length;
             
-            let recentSales = salesData.filter(s => {
-                const saleDate = s.sale_date || s.order_date;
-                return isWithinLast7Days(saleDate);
-            });
+            // Show ALL sales (no date filter)
+            let allSales = salesData;
             if (currentUser && currentUser.role !== 'admin') {
-                recentSales = recentSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
+                allSales = allSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
             }
-            const revenue = recentSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
+            const revenue = allSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
             const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled').length;
 
             container.innerHTML = `
@@ -1817,13 +1880,13 @@
                     <div class="quick-action" onclick="loadPage('my_sales')"><i class="fas fa-user-tie"></i><span class="label">My Sales</span></div>
                 </div>
                 <div class="metrics-grid">
-                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value" id="todayRevenue">${formatCurrency(revenue)}</div><div class="label">Last 7 Days Sales</div><div class="trend up" id="todayTransactions">${recentSales.length} transactions</div></div>
+                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value" id="todayRevenue">${formatCurrency(revenue)}</div><div class="label">Total Sales</div><div class="trend up" id="todayTransactions">${allSales.length} transactions</div></div>
                     <div class="metric-card"><div class="indicator green"></div><div class="icon">📦</div><div class="value">${totalProducts}</div><div class="label">Total Products</div><div class="trend up">Active catalog</div></div>
                     <div class="metric-card"><div class="indicator yellow"></div><div class="icon">⚠️</div><div class="value">${lowStock}</div><div class="label">Low Stock Items</div><div class="trend down">${lowStock > 0 ? 'Need reorder' : 'All good'}</div></div>
                     <div class="metric-card"><div class="indicator red"></div><div class="icon">📋</div><div class="value" id="pendingPOsCount">${pendingPOs}</div><div class="label">Pending POs</div><div class="trend down">${pendingPOs > 0 ? 'Awaiting delivery' : 'None pending'}</div></div>
                 </div>
                 <div class="content-grid">
-                    <div class="card"><div class="card-header"><h3>📈 Sales Trend (7 days)</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
+                    <div class="card"><div class="card-header"><h3>📈 Sales Trend</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
                         <div class="card-body"><div style="height:200px;display:flex;align-items:flex-end;padding:0 1rem;gap:0.5rem;">${getChartBars()}</div></div></div>
                     <div class="card"><div class="card-header"><h3>📋 Recent Orders</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
                         <div class="card-body"><ul class="activity-list"></ul></div></div>
@@ -1858,15 +1921,8 @@
         }
 
         function getRecentOrders() {
-            let recent = salesData.filter(s => {
-                const saleDate = s.sale_date || s.order_date;
-                return isWithinLast7Days(saleDate);
-            });
-            if (currentUser && currentUser.role !== 'admin') {
-                recent = recent.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
-            }
-            recent = recent.slice(0, 5);
-            if (recent.length === 0) return '<li style="text-align:center;color:#6B7280;padding:1rem 0;">No orders in the last 7 days</li>';
+            let recent = salesData.slice(0, 5);
+            if (recent.length === 0) return '<li style="text-align:center;color:#6B7280;padding:1rem 0;">No orders found</li>';
             return recent.map(s => `
                 <li>
                     <div class="info">
@@ -1924,10 +1980,7 @@
         // ============================================
         function showMySales(container) {
             if (!container) return;
-            let userSales = salesData.filter(s => {
-                const saleDate = s.sale_date || s.order_date;
-                return isWithinLast7Days(saleDate);
-            });
+            let userSales = salesData;
             if (currentUser && currentUser.role !== 'admin') {
                 userSales = userSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
             }
@@ -1935,7 +1988,7 @@
 
             container.innerHTML = `
                 <div class="metrics-grid">
-                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value">${formatCurrency(totalRevenue)}</div><div class="label">Last 7 Days Revenue</div></div>
+                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value">${formatCurrency(totalRevenue)}</div><div class="label">Total Revenue</div></div>
                     <div class="metric-card"><div class="indicator green"></div><div class="icon">📋</div><div class="value">${userSales.length}</div><div class="label">Transactions</div></div>
                     <div class="metric-card"><div class="indicator yellow"></div><div class="icon">📊</div><div class="value">${userSales.length > 0 ? formatCurrency(totalRevenue / userSales.length) : '$0.00'}</div><div class="label">Average Sale</div></div>
                     <div class="metric-card"><div class="indicator purple"></div><div class="icon">👤</div><div class="value">${currentUser ? currentUser.full_name : 'N/A'}</div><div class="label">Recorded By</div></div>
@@ -1943,7 +1996,7 @@
                 <div class="card">
                     <div class="card-header"><h3>📋 Sales Details</h3><span class="link">Total: ${formatCurrency(totalRevenue)}</span></div>
                     <div class="card-body">
-                        ${userSales.length === 0 ? '<p style="text-align:center;color:#6B7280;padding:1rem 0;">No sales recorded in the last 7 days.</p>' : ''}
+                        ${userSales.length === 0 ? '<p style="text-align:center;color:#6B7280;padding:1rem 0;">No sales recorded.</p>' : ''}
                         <ul class="activity-list">
                             ${userSales.map(s => `
                                 <li>
@@ -2118,7 +2171,7 @@
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">API URL</div><div style="font-size:0.8rem;font-weight:500;word-break:break-all;">${API_URL}</div></div>
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Products</div><div style="font-weight:600;">${products.length}</div></div>
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Users</div><div style="font-weight:600;">${users.length}</div></div>
-                        <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Last 7 Days Sales</div><div style="font-weight:600;">${salesData.filter(s => isWithinLast7Days(s.sale_date || s.order_date)).length}</div></div>
+                        <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Total Sales</div><div style="font-weight:600;">${salesData.length}</div></div>
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Uptime</div><div style="font-weight:600;">${hours}h ${minutes}m</div></div>
                     </div></div></div>
             `;
@@ -2330,7 +2383,7 @@
         debugLog('📡 API URL: ' + API_URL, 'info');
         debugLog('🔑 Default: admin / Admin@123', 'info');
         debugLog('🔄 Auto-refresh enabled every 15 seconds', 'info');
-        debugLog('📊 Showing sales from the last 7 days (from database only)', 'info');
+        debugLog('📊 Showing ALL sales (no date filter)', 'info');
         
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
         console.log('📡 API URL:', API_URL);
