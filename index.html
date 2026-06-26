@@ -432,7 +432,7 @@
                 </span>
             </div>
             
-            <!-- Content Container (dashboard and other pages will be injected here) -->
+            <!-- Content Container -->
             <div id="contentContainer">
                 <!-- Dynamic content loaded here -->
             </div>
@@ -442,6 +442,7 @@
                 <div class="log-entry info">🚀 Debug Console Started...</div>
                 <div class="log-entry info">📡 API URL: <span id="debugApiUrl">Loading...</span></div>
                 <div class="log-entry info">🔄 Auto-refresh enabled every 15 seconds</div>
+                <div class="log-entry info">📊 Showing sales from the last 7 days</div>
             </div>
             
             <!-- Footer -->
@@ -735,7 +736,7 @@
     <div id="toast" class="toast" style="display: none;"></div>
 
     <!-- ============================================
-    JAVASCRIPT - COMPLETE WORKING VERSION
+    JAVASCRIPT - COMPLETE WORKING VERSION WITH 7-DAY FILTER
     ============================================ -->
     <script>
         // ============================================
@@ -743,7 +744,7 @@
         // ============================================
         var API_URL = 'https://spar-erp-2026.onrender.com';
         var CLOUDFLARE_URL = API_URL;
-        var AUTO_REFRESH_INTERVAL = 15000; // 15 seconds
+        var AUTO_REFRESH_INTERVAL = 15000;
         var autoRefreshEnabled = true;
         var autoRefreshTimer = null;
         var isRefreshing = false;
@@ -814,7 +815,6 @@
             isRefreshing = true;
             loadAllData().then(() => {
                 isRefreshing = false;
-                // Update all pages that might be showing
                 if (currentPage === 'dashboard') {
                     const container = document.getElementById('contentContainer');
                     if (container) showDashboard(container);
@@ -839,7 +839,6 @@
                     const container = document.getElementById('contentContainer');
                     if (container) showMySales(container);
                 }
-                // Update badges
                 updateSalesBadge();
             }).catch(() => {
                 isRefreshing = false;
@@ -884,7 +883,7 @@
         }
 
         // ============================================
-        // NETWORK ANIMATION (simplified for brevity)
+        // NETWORK ANIMATION
         // ============================================
         (function() {
             const canvas = document.getElementById('networkCanvas');
@@ -1168,28 +1167,40 @@
         }
 
         // ============================================
-        // UPDATE DASHBOARD METRICS (with local date)
+        // HELPER: Check if a date is within the last 7 days
+        // ============================================
+        function isWithinLast7Days(dateStr) {
+            if (!dateStr) return false;
+            const d = new Date(dateStr);
+            const now = new Date();
+            // Reset time to midnight for comparison
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const diff = (today - d) / (1000 * 60 * 60 * 24); // difference in days
+            return diff >= 0 && diff <= 7;
+        }
+
+        // ============================================
+        // UPDATE DASHBOARD METRICS (last 7 days)
         // ============================================
         function updateDashboardMetrics() {
-            const today = new Date().toLocaleDateString('en-CA');
-            let todaySales = salesData.filter(s => {
+            let recentSales = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
-                return saleDate === today;
+                return isWithinLast7Days(saleDate);
             });
             if (currentUser && currentUser.role !== 'admin') {
-                todaySales = todaySales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
+                recentSales = recentSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
             }
-            const revenue = todaySales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
+            const revenue = recentSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
             const badge = document.getElementById('salesBadge');
-            if (badge) badge.textContent = todaySales.length;
+            if (badge) badge.textContent = recentSales.length;
             
             const revenueEl = document.getElementById('todayRevenue');
             const transactionsEl = document.getElementById('todayTransactions');
             if (revenueEl) revenueEl.textContent = formatCurrency(revenue);
-            if (transactionsEl) transactionsEl.textContent = todaySales.length + ' transactions';
+            if (transactionsEl) transactionsEl.textContent = recentSales.length + ' (7 days)';
             
-            debugLog('📊 Today\'s sales: ' + todaySales.length + ' transactions, $' + revenue.toFixed(2), 'info');
-            return { count: todaySales.length, revenue: revenue };
+            debugLog('📊 Last 7 days sales: ' + recentSales.length + ' transactions, $' + revenue.toFixed(2), 'info');
+            return { count: recentSales.length, revenue: revenue };
         }
 
         // ============================================
@@ -1366,13 +1377,11 @@
                     document.getElementById('salesOrderForm').reset();
                     updateSoTotals();
                     
-                    // Refresh data and update dashboard
                     await loadAllData();
                     if (currentPage === 'dashboard') {
                         const container = document.getElementById('contentContainer');
                         if (container) showDashboard(container);
                     } else {
-                        // Update badge anyway
                         updateSalesBadge();
                     }
                     return;
@@ -1527,7 +1536,7 @@
         }
 
         // ============================================
-        // GOODS RECEIPT - COMPLETE WITH STOCK UPDATE
+        // GOODS RECEIPT
         // ============================================
         async function loadGoodsReceiptPOs() {
             const select = document.getElementById('grPoSelect');
@@ -1687,21 +1696,20 @@
         }
 
         // ============================================
-        // UPDATE BADGES (with local date)
+        // UPDATE BADGES (last 7 days)
         // ============================================
         function updateSalesBadge() {
             const badge = document.getElementById('salesBadge');
             if (!badge) return;
-            const today = new Date().toLocaleDateString('en-CA');
-            let todaySales = salesData.filter(s => {
+            let recentSales = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
-                return saleDate === today;
+                return isWithinLast7Days(saleDate);
             });
             if (currentUser && currentUser.role !== 'admin') {
-                todaySales = todaySales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
+                recentSales = recentSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
             }
-            badge.textContent = todaySales.length;
-            return todaySales.length;
+            badge.textContent = recentSales.length;
+            return recentSales.length;
         }
 
         function updateProductMetrics() {
@@ -1812,7 +1820,7 @@
         }
 
         // ============================================
-        // PAGE: DASHBOARD (with local date)
+        // PAGE: DASHBOARD (last 7 days)
         // ============================================
         function showDashboard(container) {
             if (!container) return;
@@ -1824,15 +1832,14 @@
                 return status === 'low-stock' || status === 'out-of-stock';
             }).length;
             
-            const today = new Date().toLocaleDateString('en-CA');
-            let todaySales = salesData.filter(s => {
+            let recentSales = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
-                return saleDate === today;
+                return isWithinLast7Days(saleDate);
             });
             if (currentUser && currentUser.role !== 'admin') {
-                todaySales = todaySales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
+                recentSales = recentSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
             }
-            const revenue = todaySales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
+            const revenue = recentSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
             const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled').length;
 
             container.innerHTML = `
@@ -1845,13 +1852,13 @@
                     <div class="quick-action" onclick="loadPage('my_sales')"><i class="fas fa-user-tie"></i><span class="label">My Sales</span></div>
                 </div>
                 <div class="metrics-grid">
-                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value" id="todayRevenue">${formatCurrency(revenue)}</div><div class="label">Today's Sales</div><div class="trend up" id="todayTransactions">${todaySales.length} transactions</div></div>
+                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value" id="todayRevenue">${formatCurrency(revenue)}</div><div class="label">Last 7 Days Sales</div><div class="trend up" id="todayTransactions">${recentSales.length} transactions</div></div>
                     <div class="metric-card"><div class="indicator green"></div><div class="icon">📦</div><div class="value">${totalProducts}</div><div class="label">Total Products</div><div class="trend up">Active catalog</div></div>
                     <div class="metric-card"><div class="indicator yellow"></div><div class="icon">⚠️</div><div class="value">${lowStock}</div><div class="label">Low Stock Items</div><div class="trend down">${lowStock > 0 ? 'Need reorder' : 'All good'}</div></div>
                     <div class="metric-card"><div class="indicator red"></div><div class="icon">📋</div><div class="value" id="pendingPOsCount">${pendingPOs}</div><div class="label">Pending POs</div><div class="trend down">${pendingPOs > 0 ? 'Awaiting delivery' : 'None pending'}</div></div>
                 </div>
                 <div class="content-grid">
-                    <div class="card"><div class="card-header"><h3>📈 Sales Trend</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
+                    <div class="card"><div class="card-header"><h3>📈 Sales Trend (7 days)</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
                         <div class="card-body"><div style="height:200px;display:flex;align-items:flex-end;padding:0 1rem;gap:0.5rem;">${getChartBars()}</div></div></div>
                     <div class="card"><div class="card-header"><h3>📋 Recent Orders</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
                         <div class="card-body"><ul class="activity-list"></ul></div></div>
@@ -1870,7 +1877,7 @@
             for (let i = 6; i >= 0; i--) {
                 const d = new Date(now);
                 d.setDate(d.getDate() - i);
-                const dateStr = d.toLocaleDateString('en-CA');
+                const dateStr = d.toISOString().split('T')[0];
                 let daySales = salesData.filter(s => {
                     const saleDate = s.sale_date || s.order_date;
                     return saleDate === dateStr;
@@ -1886,16 +1893,15 @@
         }
 
         function getRecentOrders() {
-            const today = new Date().toLocaleDateString('en-CA');
             let recent = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
-                return saleDate === today;
+                return isWithinLast7Days(saleDate);
             });
             if (currentUser && currentUser.role !== 'admin') {
                 recent = recent.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
             }
             recent = recent.slice(0, 5);
-            if (recent.length === 0) return '<li style="text-align:center;color:#6B7280;padding:1rem 0;">No orders today</li>';
+            if (recent.length === 0) return '<li style="text-align:center;color:#6B7280;padding:1rem 0;">No orders in the last 7 days</li>';
             return recent.map(s => `
                 <li>
                     <div class="info">
@@ -1953,10 +1959,9 @@
         // ============================================
         function showMySales(container) {
             if (!container) return;
-            const today = new Date().toLocaleDateString('en-CA');
             let userSales = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
-                return saleDate === today;
+                return isWithinLast7Days(saleDate);
             });
             if (currentUser && currentUser.role !== 'admin') {
                 userSales = userSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
@@ -1965,15 +1970,15 @@
 
             container.innerHTML = `
                 <div class="metrics-grid">
-                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value">${formatCurrency(totalRevenue)}</div><div class="label">Today's Revenue</div></div>
-                    <div class="metric-card"><div class="indicator green"></div><div class="icon">📋</div><div class="value">${userSales.length}</div><div class="label">Today's Transactions</div></div>
+                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value">${formatCurrency(totalRevenue)}</div><div class="label">Last 7 Days Revenue</div></div>
+                    <div class="metric-card"><div class="indicator green"></div><div class="icon">📋</div><div class="value">${userSales.length}</div><div class="label">Transactions</div></div>
                     <div class="metric-card"><div class="indicator yellow"></div><div class="icon">📊</div><div class="value">${userSales.length > 0 ? formatCurrency(totalRevenue / userSales.length) : '$0.00'}</div><div class="label">Average Sale</div></div>
                     <div class="metric-card"><div class="indicator purple"></div><div class="icon">👤</div><div class="value">${currentUser ? currentUser.full_name : 'N/A'}</div><div class="label">Recorded By</div></div>
                 </div>
                 <div class="card">
                     <div class="card-header"><h3>📋 Sales Details</h3><span class="link">Total: ${formatCurrency(totalRevenue)}</span></div>
                     <div class="card-body">
-                        ${userSales.length === 0 ? '<p style="text-align:center;color:#6B7280;padding:1rem 0;">No sales recorded today.</p>' : ''}
+                        ${userSales.length === 0 ? '<p style="text-align:center;color:#6B7280;padding:1rem 0;">No sales recorded in the last 7 days.</p>' : ''}
                         <ul class="activity-list">
                             ${userSales.map(s => `
                                 <li>
@@ -2148,10 +2153,7 @@
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">API URL</div><div style="font-size:0.8rem;font-weight:500;word-break:break-all;">${API_URL}</div></div>
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Products</div><div style="font-weight:600;">${products.length}</div></div>
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Users</div><div style="font-weight:600;">${users.length}</div></div>
-                        <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Today's Sales</div><div style="font-weight:600;">${salesData.filter(s => {
-                            const saleDate = s.sale_date || s.order_date;
-                            return saleDate === new Date().toLocaleDateString('en-CA');
-                        }).length}</div></div>
+                        <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Last 7 Days Sales</div><div style="font-weight:600;">${salesData.filter(s => isWithinLast7Days(s.sale_date || s.order_date)).length}</div></div>
                         <div style="padding:0.5rem;background:#f8f9fa;border-radius:8px;"><div style="font-size:0.7rem;color:#6B7280;">Uptime</div><div style="font-weight:600;">${hours}h ${minutes}m</div></div>
                     </div></div></div>
             `;
@@ -2363,6 +2365,7 @@
         debugLog('📡 API URL: ' + API_URL, 'info');
         debugLog('🔑 Default: admin / Admin@123', 'info');
         debugLog('🔄 Auto-refresh enabled every 15 seconds', 'info');
+        debugLog('📊 Showing sales from the last 7 days', 'info');
         
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
         console.log('📡 API URL:', API_URL);
