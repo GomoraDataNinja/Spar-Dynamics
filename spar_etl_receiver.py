@@ -123,21 +123,15 @@ def execute_command_via_cloudflare(query, params=None):
         return {"success": False, "error": str(e)}
 
 # ============================================
-# PRODUCTS ENDPOINT - GET
+# PRODUCTS ENDPOINT - GET (NO HARDCODED DATA)
 # ============================================
 
 @app.route('/products', methods=['GET'])
 def get_products():
-    """Get all active products"""
+    """Get all active products from database"""
     try:
-        sample_products = [
-            {"id": 1, "product_code": "PRD001", "product_name": "Golden Delicious Apples", "category_name": "Fresh Produce", "unit_price": 2.99, "current_stock": 45, "available_stock": 45, "reorder_level": 20, "stock_status": "in-stock", "stock_label": "In Stock"},
-            {"id": 2, "product_code": "PRD002", "product_name": "Fresh Bananas", "category_name": "Fresh Produce", "unit_price": 1.49, "current_stock": 60, "available_stock": 60, "reorder_level": 25, "stock_status": "in-stock", "stock_label": "In Stock"},
-            {"id": 3, "product_code": "PRD003", "product_name": "Beef Steak Rump", "category_name": "Meat & Poultry", "unit_price": 12.99, "current_stock": 18, "available_stock": 18, "reorder_level": 15, "stock_status": "in-stock", "stock_label": "In Stock"}
-        ]
-        
         if not CLOUDFLARE_API_URL:
-            return jsonify(sample_products), 200
+            return jsonify({"error": "Cloudflare not configured"}), 500
         
         query = """
             SELECT 
@@ -168,7 +162,7 @@ def get_products():
             ORDER BY pc.category_name, p.product_name
         """
         result = execute_query_via_cloudflare(query)
-        return jsonify(result if result else sample_products), 200
+        return jsonify(result if result else []), 200
     except Exception as e:
         logger.error(f"Error getting products: {e}")
         return jsonify({"error": str(e)}), 500
@@ -192,12 +186,7 @@ def add_product():
             return jsonify({"error": "Category is required"}), 400
         
         if not CLOUDFLARE_API_URL:
-            logger.warning("⚠️ Cloudflare not configured, returning mock success")
-            return jsonify({
-                "status": "success",
-                "message": "Product added successfully (mock)",
-                "id": random.randint(100, 999)
-            }), 200
+            return jsonify({"error": "Cloudflare not configured"}), 500
         
         category_query = "SELECT id FROM erp_product_categories WHERE category_name = ?"
         category_result = execute_query_via_cloudflare(category_query, [data['category_name']])
@@ -263,15 +252,10 @@ def add_product():
 
 @app.route('/sales-orders', methods=['GET'])
 def get_sales_orders():
-    """Get all sales orders"""
+    """Get all sales orders from database"""
     try:
-        sample_orders = [
-            {"order_number": "SO-20260624-1001", "customer_name": "John Doe", "order_date": "2026-06-24", "order_time": "10:30:00", "total_amount": 45.50, "status": "Confirmed", "recorded_by": "admin"},
-            {"order_number": "SO-20260624-1002", "customer_name": "Jane Smith", "order_date": "2026-06-24", "order_time": "11:15:00", "total_amount": 67.25, "status": "Confirmed", "recorded_by": "operator1"}
-        ]
-        
         if not CLOUDFLARE_API_URL:
-            return jsonify(sample_orders), 200
+            return jsonify({"error": "Cloudflare not configured"}), 500
         
         query = """
             SELECT 
@@ -287,7 +271,7 @@ def get_sales_orders():
             ORDER BY so.created_at DESC
         """
         result = execute_query_via_cloudflare(query)
-        return jsonify(result if result else sample_orders), 200
+        return jsonify(result if result else []), 200
     except Exception as e:
         logger.error(f"Error getting sales orders: {e}")
         return jsonify({"error": str(e)}), 500
@@ -311,13 +295,7 @@ def create_sales_order():
         rewards = total * 0.02
         
         if not CLOUDFLARE_API_URL:
-            return jsonify({
-                "status": "success",
-                "order_number": order_number,
-                "invoice_number": "INV-" + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999)),
-                "total_amount": total,
-                "rewards_earned": rewards
-            }), 200
+            return jsonify({"error": "Cloudflare not configured"}), 500
         
         customer_name = data['customer_name'].strip()
         customer_email = data.get('customer_email', '').strip()
@@ -361,7 +339,23 @@ def create_sales_order():
         
         order_id = result.get('id', 0)
         
-        for item in items:
+        # Insert order lines
+        for i, item in enumerate(items):
+            line_query = """
+                INSERT INTO erp_sales_order_lines (
+                    so_id, line_number, product_id, product_code, product_name,
+                    quantity, unit_price, line_total
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            line_params = (
+                order_id, i + 1, item['product_id'], 
+                item.get('product_code', ''), item.get('product_name', ''),
+                item['quantity'], item['unit_price'],
+                item['quantity'] * item['unit_price']
+            )
+            execute_command_via_cloudflare(line_query, line_params)
+            
+            # Update stock
             update_stock_query = "UPDATE erp_products SET current_stock = current_stock - ? WHERE id = ?"
             execute_command_via_cloudflare(update_stock_query, (item['quantity'], item['product_id']))
         
@@ -383,15 +377,10 @@ def create_sales_order():
 
 @app.route('/purchase-orders', methods=['GET'])
 def get_purchase_orders():
-    """Get all purchase orders"""
+    """Get all purchase orders from database"""
     try:
-        sample_pos = [
-            {"po_number": "PO-20260624-1001", "supplier_name": "Fresh Foods Ltd", "order_date": "2026-06-24", "expected_delivery_date": "2026-07-01", "status": "Draft", "total_amount": 500.00, "id": 1},
-            {"po_number": "PO-20260624-1002", "supplier_name": "Meat Suppliers Inc", "order_date": "2026-06-24", "expected_delivery_date": "2026-06-30", "status": "Received", "total_amount": 750.00, "id": 2}
-        ]
-        
         if not CLOUDFLARE_API_URL:
-            return jsonify(sample_pos), 200
+            return jsonify({"error": "Cloudflare not configured"}), 500
         
         query = """
             SELECT 
@@ -407,7 +396,7 @@ def get_purchase_orders():
             ORDER BY po.created_at DESC
         """
         result = execute_query_via_cloudflare(query)
-        return jsonify(result if result else sample_pos), 200
+        return jsonify(result if result else []), 200
     except Exception as e:
         logger.error(f"Error getting purchase orders: {e}")
         return jsonify({"error": str(e)}), 500
@@ -423,11 +412,7 @@ def get_purchase_order_lines(po_number):
         logger.info(f"📋 Fetching lines for PO: {po_number}")
         
         if not CLOUDFLARE_API_URL:
-            sample_lines = [
-                {"product_id": 1, "product_code": "PRD001", "product_name": "Golden Delicious Apples", "quantity": 10, "unit_price": 1.50},
-                {"product_id": 2, "product_code": "PRD002", "product_name": "Fresh Bananas", "quantity": 20, "unit_price": 0.80}
-            ]
-            return jsonify(sample_lines), 200
+            return jsonify({"error": "Cloudflare not configured"}), 500
         
         # First, get the PO ID
         po_id_query = "SELECT id FROM erp_purchase_orders WHERE po_number = ?"
@@ -481,21 +466,15 @@ def create_purchase_order():
         po_number = 'PO-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
         items = data.get('items', [])
         
-        logger.info(f"📦 Items count: {len(items)}")
-        for idx, item in enumerate(items):
-            logger.info(f"   Item {idx+1}: {item.get('product_name')} x {item.get('quantity')}")
+        if not items:
+            return jsonify({"error": "No items provided"}), 400
         
         subtotal = sum(item['quantity'] * item['unit_price'] for item in items)
         tax = subtotal * 0.155
         total = subtotal + tax
         
         if not CLOUDFLARE_API_URL:
-            logger.warning("⚠️ Cloudflare not configured, returning mock success")
-            return jsonify({
-                "status": "success",
-                "po_number": po_number,
-                "total_amount": total
-            }), 200
+            return jsonify({"error": "Cloudflare not configured"}), 500
         
         supplier_name = data['supplier_name'].strip()
         supplier_email = data.get('supplier_email', '').strip()
@@ -640,12 +619,7 @@ def receive_goods():
         receipt_number = 'GRN-' + datetime.now().strftime('%Y%m%d') + '-' + str(random.randint(1000, 9999))
         
         if not CLOUDFLARE_API_URL:
-            return jsonify({
-                "status": "success",
-                "receipt_number": receipt_number,
-                "total_quantity": sum(item['quantity'] for item in data.get('items', [])),
-                "total_cost": sum(item['quantity'] * item['unit_cost'] for item in data.get('items', []))
-            }), 200
+            return jsonify({"error": "Cloudflare not configured"}), 500
         
         # Get PO details
         po_query = "SELECT id, supplier_id FROM erp_purchase_orders WHERE po_number = ?"
@@ -759,20 +733,15 @@ def receive_goods():
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# RECENT SALES ENDPOINT
+# RECENT SALES ENDPOINT - NO HARDCODED DATA
 # ============================================
 
 @app.route('/recent', methods=['GET'])
 def get_recent_sales():
-    """Get recent sales"""
+    """Get recent sales from database"""
     try:
-        sample_sales = [
-            {"sale_id": "SO-20260625-1001", "customer_name": "John Doe", "total_sales": 45.50, "sale_date": "2026-06-25", "sale_time": "10:30:00", "recorded_by": "admin", "etl_processed": 1},
-            {"sale_id": "SO-20260625-1002", "customer_name": "Jane Smith", "total_sales": 67.25, "sale_date": "2026-06-25", "sale_time": "11:15:00", "recorded_by": "operator1", "etl_processed": 1}
-        ]
-        
         if not CLOUDFLARE_API_URL:
-            return jsonify(sample_sales), 200
+            return jsonify({"error": "Cloudflare not configured"}), 500
         
         query = """
             SELECT TOP 50
@@ -790,7 +759,7 @@ def get_recent_sales():
             ORDER BY so.created_at DESC
         """
         result = execute_query_via_cloudflare(query)
-        return jsonify(result if result else sample_sales), 200
+        return jsonify(result if result else []), 200
     except Exception as e:
         logger.error(f"Error getting recent sales: {e}")
         return jsonify([]), 200
