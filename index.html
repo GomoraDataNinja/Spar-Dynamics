@@ -414,9 +414,6 @@
                     <button class="btn btn-outline" onclick="refreshData()">
                         <i class="fas fa-sync"></i> Refresh
                     </button>
-                    <button class="btn btn-outline" onclick="debugSales()" style="border-color:#dc3545;color:#dc3545;">
-                        <i class="fas fa-bug"></i> Debug
-                    </button>
                 </div>
             </div>
             
@@ -445,7 +442,7 @@
                 <div class="log-entry info">🚀 Debug Console Started...</div>
                 <div class="log-entry info">📡 API URL: <span id="debugApiUrl">Loading...</span></div>
                 <div class="log-entry info">🔄 Auto-refresh enabled every 15 seconds</div>
-                <div class="log-entry info">📊 Showing ALL sales (no date filter)</div>
+                <div class="log-entry info">👤 Role: <span id="debugRole">Loading...</span></div>
             </div>
             
             <!-- Footer -->
@@ -457,7 +454,7 @@
     </div>
 
     <!-- ============================================
-    MODALS - New Sale, PO, Goods Receipt, Product, User
+    MODALS - Same as before
     ============================================ -->
     <div class="modal-overlay" id="salesOrderModal">
         <div class="modal">
@@ -506,200 +503,15 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="poModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>📦 New Purchase Order</h2>
-                <button class="close-btn" onclick="closeModal('poModal')">×</button>
-            </div>
-            <form id="poForm" onsubmit="submitPurchaseOrder(event)">
-                <!-- Same as before -->
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Supplier Name *</label>
-                        <input type="text" id="poSupplierName" placeholder="Supplier name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Supplier Email</label>
-                        <input type="email" id="poSupplierEmail" placeholder="supplier@example.com">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Expected Delivery Date</label>
-                    <input type="date" id="poExpectedDate">
-                </div>
-                <div style="margin: 1rem 0; padding: 0.5rem; background: #f8f9fa; border-radius: 8px;">
-                    <h4 style="font-size: 0.85rem; color: #002B5C; margin-bottom: 0.5rem;">Order Items</h4>
-                    <div id="poItemsContainer">
-                        <div class="item-row">
-                            <select id="poProductId_0" onchange="updatePoItemInfo(0)" style="padding:0.4rem 0.5rem;border:1px solid #dadce0;border-radius:6px;font-size:0.8rem;">
-                                <option value="">Select Product</option>
-                            </select>
-                            <input type="number" id="poQty_0" value="1" min="1" onchange="updatePoTotals()">
-                            <input type="number" id="poPrice_0" value="0.00" min="0.01" step="0.01" onchange="updatePoTotals()">
-                            <button type="button" class="remove-btn" onclick="this.parentElement.remove(); updatePoTotals();">×</button>
-                        </div>
-                    </div>
-                    <button type="button" class="add-item-btn" onclick="addPoItem()">
-                        <i class="fas fa-plus"></i> Add Item
-                    </button>
-                </div>
-                <div class="order-summary">
-                    <div class="row"><span>Subtotal:</span><span id="poSubtotal">$0.00</span></div>
-                    <div class="row" style="font-size:0.85rem;color:#6B7280;"><span>VAT (15.5%):</span><span id="poTax">$0.00</span></div>
-                    <div class="row total"><span>Total:</span><span id="poTotal">$0.00</span></div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('poModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">📦 Create PO</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <!-- Other modals (poModal, goodsReceiptModal, productModal, userModal) - same as before -->
+    <!-- I'll keep them short for brevity, but you should keep your full modals -->
+    <div class="modal-overlay" id="poModal"><div class="modal"><div class="modal-header"><h2>📦 New Purchase Order</h2><button class="close-btn" onclick="closeModal('poModal')">×</button></div><form id="poForm" onsubmit="submitPurchaseOrder(event)"><div class="form-row"><div class="form-group"><label>Supplier Name *</label><input type="text" id="poSupplierName" placeholder="Supplier name" required></div><div class="form-group"><label>Supplier Email</label><input type="email" id="poSupplierEmail" placeholder="supplier@example.com"></div></div><div class="form-group"><label>Expected Delivery Date</label><input type="date" id="poExpectedDate"></div><div style="margin: 1rem 0; padding: 0.5rem; background: #f8f9fa; border-radius: 8px;"><h4 style="font-size: 0.85rem; color: #002B5C; margin-bottom: 0.5rem;">Order Items</h4><div id="poItemsContainer"><div class="item-row"><select id="poProductId_0" onchange="updatePoItemInfo(0)" style="padding:0.4rem 0.5rem;border:1px solid #dadce0;border-radius:6px;font-size:0.8rem;"><option value="">Select Product</option></select><input type="number" id="poQty_0" value="1" min="1" onchange="updatePoTotals()"><input type="number" id="poPrice_0" value="0.00" min="0.01" step="0.01" onchange="updatePoTotals()"><button type="button" class="remove-btn" onclick="this.parentElement.remove(); updatePoTotals();">×</button></div></div><button type="button" class="add-item-btn" onclick="addPoItem()"><i class="fas fa-plus"></i> Add Item</button></div><div class="order-summary"><div class="row"><span>Subtotal:</span><span id="poSubtotal">$0.00</span></div><div class="row" style="font-size:0.85rem;color:#6B7280;"><span>VAT (15.5%):</span><span id="poTax">$0.00</span></div><div class="row total"><span>Total:</span><span id="poTotal">$0.00</span></div></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal('poModal')">Cancel</button><button type="submit" class="btn btn-primary">📦 Create PO</button></div></form></div></div>
 
-    <div class="modal-overlay" id="goodsReceiptModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>📥 Receive Goods</h2>
-                <button class="close-btn" onclick="closeModal('goodsReceiptModal')">×</button>
-            </div>
-            <form id="goodsReceiptForm" onsubmit="submitGoodsReceipt(event)">
-                <div class="form-group">
-                    <label>Purchase Order</label>
-                    <select id="grPoSelect" required>
-                        <option value="">Select PO</option>
-                    </select>
-                </div>
-                <div id="grItemsContainer"></div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('goodsReceiptModal')">Cancel</button>
-                    <button type="submit" class="btn btn-success">📥 Receive Goods</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div class="modal-overlay" id="goodsReceiptModal"><div class="modal"><div class="modal-header"><h2>📥 Receive Goods</h2><button class="close-btn" onclick="closeModal('goodsReceiptModal')">×</button></div><form id="goodsReceiptForm" onsubmit="submitGoodsReceipt(event)"><div class="form-group"><label>Purchase Order</label><select id="grPoSelect" required><option value="">Select PO</option></select></div><div id="grItemsContainer"></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal('goodsReceiptModal')">Cancel</button><button type="submit" class="btn btn-success">📥 Receive Goods</button></div></form></div></div>
 
-    <div class="modal-overlay" id="productModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>📦 Add New Product</h2>
-                <button class="close-btn" onclick="closeModal('productModal')">×</button>
-            </div>
-            <form id="productForm" onsubmit="submitProduct(event)">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Product Code *</label>
-                        <input type="text" id="prodCode" placeholder="e.g., PRD001" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Product Name *</label>
-                        <input type="text" id="prodName" placeholder="Product name" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Category *</label>
-                        <select id="prodCategory" required>
-                            <option value="">Select Category</option>
-                            <option value="Fresh Produce">Fresh Produce</option>
-                            <option value="Meat & Poultry">Meat & Poultry</option>
-                            <option value="Dairy">Dairy</option>
-                            <option value="Bakery">Bakery</option>
-                            <option value="Beverages">Beverages</option>
-                            <option value="Household">Household</option>
-                            <option value="Personal Care">Personal Care</option>
-                            <option value="Snacks & Sweets">Snacks & Sweets</option>
-                            <option value="Frozen Foods">Frozen Foods</option>
-                            <option value="Grocery">Grocery</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Unit of Measure</label>
-                        <select id="prodUOM">
-                            <option value="EA">EA (Each)</option>
-                            <option value="KG">KG</option>
-                            <option value="L">L</option>
-                            <option value="ML">ML</option>
-                            <option value="G">G</option>
-                            <option value="CTN">CTN</option>
-                            <option value="PACK">PACK</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Unit Price (USD)</label>
-                        <input type="number" id="prodPrice" value="0.00" min="0.01" step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label>Cost Price (USD)</label>
-                        <input type="number" id="prodCost" value="0.00" min="0.01" step="0.01">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Initial Stock</label>
-                        <input type="number" id="prodStock" value="0" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Reorder Level</label>
-                        <input type="number" id="prodReorder" value="10" min="1">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Description</label>
-                    <input type="text" id="prodDesc" placeholder="Product description (optional)">
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('productModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">💾 Add Product</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div class="modal-overlay" id="productModal"><div class="modal"><div class="modal-header"><h2>📦 Add New Product</h2><button class="close-btn" onclick="closeModal('productModal')">×</button></div><form id="productForm" onsubmit="submitProduct(event)"><div class="form-row"><div class="form-group"><label>Product Code *</label><input type="text" id="prodCode" placeholder="e.g., PRD001" required></div><div class="form-group"><label>Product Name *</label><input type="text" id="prodName" placeholder="Product name" required></div></div><div class="form-row"><div class="form-group"><label>Category *</label><select id="prodCategory" required><option value="">Select Category</option><option value="Fresh Produce">Fresh Produce</option><option value="Meat & Poultry">Meat & Poultry</option><option value="Dairy">Dairy</option><option value="Bakery">Bakery</option><option value="Beverages">Beverages</option><option value="Household">Household</option><option value="Personal Care">Personal Care</option><option value="Snacks & Sweets">Snacks & Sweets</option><option value="Frozen Foods">Frozen Foods</option><option value="Grocery">Grocery</option></select></div><div class="form-group"><label>Unit of Measure</label><select id="prodUOM"><option value="EA">EA (Each)</option><option value="KG">KG</option><option value="L">L</option><option value="ML">ML</option><option value="G">G</option><option value="CTN">CTN</option><option value="PACK">PACK</option></select></div></div><div class="form-row"><div class="form-group"><label>Unit Price (USD)</label><input type="number" id="prodPrice" value="0.00" min="0.01" step="0.01"></div><div class="form-group"><label>Cost Price (USD)</label><input type="number" id="prodCost" value="0.00" min="0.01" step="0.01"></div></div><div class="form-row"><div class="form-group"><label>Initial Stock</label><input type="number" id="prodStock" value="0" min="0"></div><div class="form-group"><label>Reorder Level</label><input type="number" id="prodReorder" value="10" min="1"></div></div><div class="form-group"><label>Description</label><input type="text" id="prodDesc" placeholder="Product description (optional)"></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal('productModal')">Cancel</button><button type="submit" class="btn btn-primary">💾 Add Product</button></div></form></div></div>
 
-    <div class="modal-overlay" id="userModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>👤 Add New User</h2>
-                <button class="close-btn" onclick="closeModal('userModal')">×</button>
-            </div>
-            <form id="userForm" onsubmit="submitUser(event)">
-                <!-- Same as before -->
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Full Name *</label>
-                        <input type="text" id="userFullName" placeholder="John Doe" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Username *</label>
-                        <input type="text" id="userUsername" placeholder="johndoe" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Email *</label>
-                        <input type="email" id="userEmail" placeholder="john@spar.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Role *</label>
-                        <select id="userRole" required>
-                            <option value="operator">Operator</option>
-                            <option value="admin">Administrator</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Password *</label>
-                    <input type="password" id="userPassword" placeholder="Min 6 characters" required minlength="6">
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">👤 Create User</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div class="modal-overlay" id="userModal"><div class="modal"><div class="modal-header"><h2>👤 Add New User</h2><button class="close-btn" onclick="closeModal('userModal')">×</button></div><form id="userForm" onsubmit="submitUser(event)"><div class="form-row"><div class="form-group"><label>Full Name *</label><input type="text" id="userFullName" placeholder="John Doe" required></div><div class="form-group"><label>Username *</label><input type="text" id="userUsername" placeholder="johndoe" required></div></div><div class="form-row"><div class="form-group"><label>Email *</label><input type="email" id="userEmail" placeholder="john@spar.com" required></div><div class="form-group"><label>Role *</label><select id="userRole" required><option value="operator">Operator</option><option value="admin">Administrator</option></select></div></div><div class="form-group"><label>Password *</label><input type="password" id="userPassword" placeholder="Min 6 characters" required minlength="6"></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button><button type="submit" class="btn btn-primary">👤 Create User</button></div></form></div></div>
 
     <!-- ============================================
     TOAST NOTIFICATION
@@ -707,7 +519,7 @@
     <div id="toast" class="toast" style="display: none;"></div>
 
     <!-- ============================================
-    JAVASCRIPT - COMPLETE FIXED VERSION
+    JAVASCRIPT - COMPLETE WITH ROLE-BASED ACCESS
     ============================================ -->
     <script>
         // ============================================
@@ -854,7 +666,7 @@
         }
 
         // ============================================
-        // NETWORK ANIMATION
+        // NETWORK ANIMATION (simplified)
         // ============================================
         (function() {
             const canvas = document.getElementById('networkCanvas');
@@ -983,7 +795,11 @@
                 
                 document.getElementById('adminMenu').style.display = user.role === 'admin' ? 'block' : 'none';
                 
-                debugLog('✅ User logged in: ' + user.full_name, 'success');
+                // Update debug role display
+                const roleDisplay = document.getElementById('debugRole');
+                if (roleDisplay) roleDisplay.textContent = user.role.toUpperCase();
+                
+                debugLog('✅ User logged in: ' + user.full_name + ' (Role: ' + user.role + ')', 'success');
                 
                 setTimeout(() => {
                     loadAllData();
@@ -1014,7 +830,7 @@
         }
 
         // ============================================
-        // LOAD DATA - WITH FORCED REFRESH
+        // LOAD DATA
         // ============================================
         async function loadAllData() {
             debugLog('🔄 Loading all data...', 'info');
@@ -1043,7 +859,6 @@
                     return;
                 }
                 products = [];
-                debugLog('⚠️ No products found in database', 'warning');
                 if (document.getElementById('productList')) {
                     renderProducts(products);
                 }
@@ -1121,28 +936,6 @@
                     debugLog('✅ Loaded ' + salesData.length + ' recent sales from database', 'success');
                     if (salesData.length > 0) {
                         debugLog('📊 Sample sale: ' + JSON.stringify(salesData[0]), 'info');
-                    } else {
-                        // Try debug endpoint as fallback
-                        debugLog('⚠️ No sales in /recent, trying /debug/sales...', 'warning');
-                        const debugResponse = await fetch(API_URL + '/debug/sales');
-                        if (debugResponse.ok) {
-                            const debugData = await debugResponse.json();
-                            if (debugData.length > 0) {
-                                debugLog('✅ Found ' + debugData.length + ' sales in debug endpoint!', 'success');
-                                // Convert debug data to match salesData format
-                                salesData = debugData.map(s => ({
-                                    sale_id: s.so_number,
-                                    customer_name: s.customer_name,
-                                    sale_date: s.order_date,
-                                    total_sales: s.total_amount,
-                                    recorded_by: 'system',
-                                    etl_processed: 1
-                                }));
-                                debugLog('📊 Converted ' + salesData.length + ' debug sales to salesData', 'info');
-                            } else {
-                                debugLog('❌ No sales found in debug endpoint either.', 'error');
-                            }
-                        }
                     }
                     updateSalesBadge();
                     updateDashboardMetrics();
@@ -1158,38 +951,48 @@
         }
 
         // ============================================
-        // HELPER FUNCTIONS
+        // ROLE-BASED FILTERING FUNCTIONS
         // ============================================
-        function isWithinLast7Days(dateStr) {
-            if (!dateStr) return false;
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return false;
-            const now = new Date();
-            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const diff = (today - d) / (1000 * 60 * 60 * 24);
-            return diff >= 0 && diff <= 7;
+        function getFilteredSales() {
+            if (!currentUser) return [];
+            // Admin sees all sales
+            if (currentUser.role === 'admin') {
+                return salesData;
+            }
+            // Operator sees only their own sales
+            return salesData.filter(s => {
+                const recordedBy = s.recorded_by || s.created_by;
+                return recordedBy === currentUser.username;
+            });
+        }
+
+        function getFilteredSalesOrders() {
+            if (!currentUser) return [];
+            if (currentUser.role === 'admin') {
+                return salesOrders;
+            }
+            return salesOrders.filter(s => {
+                const recordedBy = s.recorded_by || s.created_by;
+                return recordedBy === currentUser.username;
+            });
         }
 
         // ============================================
-        // UPDATE DASHBOARD METRICS
+        // UPDATE DASHBOARD METRICS (Role-based)
         // ============================================
         function updateDashboardMetrics() {
-            // Show ALL sales (no date filter for debugging)
-            let recentSales = salesData;
-            if (currentUser && currentUser.role !== 'admin') {
-                recentSales = recentSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
-            }
-            const revenue = recentSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
+            const filteredSales = getFilteredSales();
+            const revenue = filteredSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
             const badge = document.getElementById('salesBadge');
-            if (badge) badge.textContent = recentSales.length;
+            if (badge) badge.textContent = filteredSales.length;
             
             const revenueEl = document.getElementById('todayRevenue');
             const transactionsEl = document.getElementById('todayTransactions');
             if (revenueEl) revenueEl.textContent = formatCurrency(revenue);
-            if (transactionsEl) transactionsEl.textContent = recentSales.length + ' total sales';
+            if (transactionsEl) transactionsEl.textContent = filteredSales.length + ' transactions';
             
-            debugLog('📊 Total sales: ' + recentSales.length + ' transactions, $' + revenue.toFixed(2), 'info');
-            return { count: recentSales.length, revenue: revenue };
+            debugLog('📊 ' + (currentUser?.role === 'admin' ? 'All' : 'My') + ' sales: ' + filteredSales.length + ' transactions, $' + revenue.toFixed(2), 'info');
+            return { count: filteredSales.length, revenue: revenue };
         }
 
         // ============================================
@@ -1297,7 +1100,7 @@
         }
 
         // ============================================
-        // SUBMIT SALES ORDER - FIXED WITH FORCED REFRESH
+        // SUBMIT SALES ORDER
         // ============================================
         async function submitSalesOrder(event) {
             event.preventDefault();
@@ -1350,7 +1153,7 @@
                 recorded_by: currentUser.username
             };
 
-            debugLog('📝 Submitting sale: ' + JSON.stringify(orderData), 'info');
+            debugLog('📝 Submitting sale for ' + currentUser.username + ': ' + JSON.stringify(orderData), 'info');
 
             try {
                 showToast('⏳ Recording sale...', 'info');
@@ -1363,29 +1166,13 @@
 
                 if (response.ok) {
                     const result = await response.json();
-                    debugLog('✅ Sale recorded successfully! Order: ' + result.order_number + ', Total: ' + result.total_amount, 'success');
+                    debugLog('✅ Sale recorded by ' + currentUser.username + '! Order: ' + result.order_number, 'success');
                     showToast('✅ Sale recorded! Order: ' + result.order_number + ' | Total: ' + formatCurrency(result.total_amount), 'success');
                     closeModal('salesOrderModal');
                     document.getElementById('salesOrderForm').reset();
                     updateSoTotals();
                     
-                    // FORCE REFRESH - load data multiple times to ensure it gets updated
-                    debugLog('🔄 Forcing data refresh after sale...', 'info');
                     await loadAllData();
-                    
-                    // Extra: Direct fetch to ensure sales are loaded
-                    try {
-                        const directResponse = await fetch(API_URL + '/recent');
-                        if (directResponse.ok) {
-                            const directData = await directResponse.json();
-                            salesData = directData || [];
-                            debugLog('✅ Direct fetch loaded ' + salesData.length + ' sales', 'success');
-                        }
-                    } catch (e) {
-                        debugLog('⚠️ Direct fetch failed: ' + e.message, 'warning');
-                    }
-                    
-                    // Update dashboard
                     if (currentPage === 'dashboard') {
                         const container = document.getElementById('contentContainer');
                         if (container) showDashboard(container);
@@ -1401,32 +1188,6 @@
             } catch (error) {
                 debugLog('❌ Sale error: ' + error.message, 'error');
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
-            }
-        }
-
-        // ============================================
-        // DEBUG SALES FUNCTION
-        // ============================================
-        async function debugSales() {
-            debugLog('🐛 Debugging sales...', 'info');
-            try {
-                const response = await fetch(API_URL + '/debug/sales');
-                if (response.ok) {
-                    const data = await response.json();
-                    debugLog('🔍 Debug sales (' + data.length + '): ' + JSON.stringify(data, null, 2), 'info');
-                    showToast('Found ' + data.length + ' sales in debug. Check console.', 'info');
-                    
-                    // Also try /recent
-                    const recentResponse = await fetch(API_URL + '/recent');
-                    if (recentResponse.ok) {
-                        const recentData = await recentResponse.json();
-                        debugLog('📊 Recent sales (' + recentData.length + '): ' + JSON.stringify(recentData, null, 2), 'info');
-                    }
-                } else {
-                    showToast('Debug endpoint failed: ' + response.status, 'error');
-                }
-            } catch (e) {
-                showToast('Error: ' + e.message, 'error');
             }
         }
 
@@ -1551,7 +1312,7 @@
 
                 if (response.ok) {
                     const result = await response.json();
-                    debugLog('✅ PO created: ' + result.po_number + ' with ' + (result.lines_inserted || items.length) + ' items', 'success');
+                    debugLog('✅ PO created: ' + result.po_number, 'success');
                     showToast('✅ Purchase Order ' + result.po_number + ' created!', 'success');
                     closeModal('poModal');
                     document.getElementById('poForm').reset();
@@ -1658,8 +1419,8 @@
                 
                 if (response.ok) {
                     const result = await response.json();
-                    debugLog('✅ Goods received! Receipt: ' + result.receipt_number + ', Quantity: ' + result.total_quantity, 'success');
-                    showToast('✅ Goods received! ' + result.total_quantity + ' items received. Stock updated!', 'success');
+                    debugLog('✅ Goods received! Receipt: ' + result.receipt_number, 'success');
+                    showToast('✅ Goods received! Stock updated!', 'success');
                     closeModal('goodsReceiptModal');
                     await loadAllData();
                     loadPage('goods_receipt');
@@ -1682,7 +1443,7 @@
             const container = document.getElementById('productList');
             if (!container) return;
             if (!productList || productList.length === 0) {
-                container.innerHTML = `<div style="text-align:center;padding:2rem;color:#6B7280;"><i class="fas fa-box-open" style="font-size:2rem;display:block;margin-bottom:0.5rem;"></i>No products found in database.</div>`;
+                container.innerHTML = `<div style="text-align:center;padding:2rem;color:#6B7280;"><i class="fas fa-box-open" style="font-size:2rem;display:block;margin-bottom:0.5rem;"></i>No products found.</div>`;
                 return;
             }
             let html = '<div class="product-grid">';
@@ -1735,8 +1496,9 @@
         function updateSalesBadge() {
             const badge = document.getElementById('salesBadge');
             if (!badge) return;
-            badge.textContent = salesData.length;
-            return salesData.length;
+            const filtered = getFilteredSales();
+            badge.textContent = filtered.length;
+            return filtered.length;
         }
 
         function updateProductMetrics() {
@@ -1795,21 +1557,24 @@
                     <button class="btn btn-outline" onclick="refreshData()">
                         <i class="fas fa-sync"></i> Refresh
                     </button>
-                    <button class="btn btn-outline" onclick="debugSales()" style="border-color:#dc3545;color:#dc3545;">
-                        <i class="fas fa-bug"></i> Debug
-                    </button>
                 `;
+            }
+
+            // Update subtitle based on role
+            const roleText = currentUser?.role === 'admin' ? ' (Admin - All Data)' : ' (Operator - My Sales Only)';
+            if (subtitle) {
+                const baseText = getGreeting() + '! Here\'s your business overview.';
+                subtitle.textContent = baseText + roleText;
             }
 
             switch(page) {
                 case 'dashboard': 
                     if (title) title.textContent = '📊 Role Center'; 
-                    if (subtitle) subtitle.textContent = getGreeting() + '! Here\'s your business overview.'; 
                     showDashboard(container); 
                     break;
                 case 'sales_orders': 
                     if (title) title.textContent = '📋 Sales Orders'; 
-                    if (subtitle) subtitle.textContent = 'View all sales orders and invoices.'; 
+                    if (subtitle) subtitle.textContent = 'View all sales orders and invoices.' + roleText;
                     showSalesOrders(container); 
                     break;
                 case 'my_sales': 
@@ -1850,7 +1615,7 @@
         }
 
         // ============================================
-        // PAGE: DASHBOARD
+        // PAGE: DASHBOARD (Role-based)
         // ============================================
         function showDashboard(container) {
             if (!container) return;
@@ -1862,13 +1627,12 @@
                 return status === 'low-stock' || status === 'out-of-stock';
             }).length;
             
-            // Show ALL sales (no date filter)
-            let allSales = salesData;
-            if (currentUser && currentUser.role !== 'admin') {
-                allSales = allSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
-            }
-            const revenue = allSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
+            const filteredSales = getFilteredSales();
+            const revenue = filteredSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
             const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled').length;
+
+            const isAdmin = currentUser?.role === 'admin';
+            const titleText = isAdmin ? 'Total Sales' : 'My Sales';
 
             container.innerHTML = `
                 <div class="quick-actions">
@@ -1880,7 +1644,7 @@
                     <div class="quick-action" onclick="loadPage('my_sales')"><i class="fas fa-user-tie"></i><span class="label">My Sales</span></div>
                 </div>
                 <div class="metrics-grid">
-                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value" id="todayRevenue">${formatCurrency(revenue)}</div><div class="label">Total Sales</div><div class="trend up" id="todayTransactions">${allSales.length} transactions</div></div>
+                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value" id="todayRevenue">${formatCurrency(revenue)}</div><div class="label">${titleText}</div><div class="trend up" id="todayTransactions">${filteredSales.length} transactions</div></div>
                     <div class="metric-card"><div class="indicator green"></div><div class="icon">📦</div><div class="value">${totalProducts}</div><div class="label">Total Products</div><div class="trend up">Active catalog</div></div>
                     <div class="metric-card"><div class="indicator yellow"></div><div class="icon">⚠️</div><div class="value">${lowStock}</div><div class="label">Low Stock Items</div><div class="trend down">${lowStock > 0 ? 'Need reorder' : 'All good'}</div></div>
                     <div class="metric-card"><div class="indicator red"></div><div class="icon">📋</div><div class="value" id="pendingPOsCount">${pendingPOs}</div><div class="label">Pending POs</div><div class="trend down">${pendingPOs > 0 ? 'Awaiting delivery' : 'None pending'}</div></div>
@@ -1899,20 +1663,18 @@
         }
 
         function getChartBars() {
+            const filteredSales = getFilteredSales();
             let html = '';
             const now = new Date();
-            const maxVal = Math.max(1, ...salesData.map(s => parseFloat(s.total_sales || 0)));
+            const maxVal = Math.max(1, ...filteredSales.map(s => parseFloat(s.total_sales || 0)));
             for (let i = 6; i >= 0; i--) {
                 const d = new Date(now);
                 d.setDate(d.getDate() - i);
                 const dateStr = d.toISOString().split('T')[0];
-                let daySales = salesData.filter(s => {
+                let daySales = filteredSales.filter(s => {
                     const saleDate = s.sale_date || s.order_date;
                     return saleDate === dateStr;
                 });
-                if (currentUser && currentUser.role !== 'admin') {
-                    daySales = daySales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
-                }
                 const total = daySales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
                 const height = maxVal > 0 ? Math.max(5, (total / maxVal) * 100) : 5;
                 html += `<div style="flex:1;height:${height}%;background:#0052A5;border-radius:6px 6px 0 0;min-height:20px;opacity:${total > 0 ? 1 : 0.3};"></div>`;
@@ -1921,7 +1683,8 @@
         }
 
         function getRecentOrders() {
-            let recent = salesData.slice(0, 5);
+            const filteredSales = getFilteredSales();
+            let recent = filteredSales.slice(0, 5);
             if (recent.length === 0) return '<li style="text-align:center;color:#6B7280;padding:1rem 0;">No orders found</li>';
             return recent.map(s => `
                 <li>
@@ -1944,20 +1707,25 @@
         }
 
         // ============================================
-        // PAGE: SALES ORDERS
+        // PAGE: SALES ORDERS (Role-based)
         // ============================================
         function showSalesOrders(container) {
             if (!container) return;
+            const filteredOrders = getFilteredSalesOrders();
+            const isAdmin = currentUser?.role === 'admin';
+            
             container.innerHTML = `
                 <div class="card">
-                    <div class="card-header"><h3>📋 All Sales Orders</h3><span class="link">Total: ${salesOrders.length} orders</span></div>
+                    <div class="card-header"><h3>📋 ${isAdmin ? 'All' : 'My'} Sales Orders</h3>
+                        <span class="link">${filteredOrders.length} orders</span>
+                    </div>
                     <div class="card-body">
-                        ${salesOrders.length === 0 ? '<p style="text-align:center;color:#6B7280;padding:1rem 0;">No sales orders found.</p>' : ''}
+                        ${filteredOrders.length === 0 ? '<p style="text-align:center;color:#6B7280;padding:1rem 0;">No sales orders found.</p>' : ''}
                         <div class="table-container">
                             <table>
                                 <thead><tr><th>Order #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>Recorded By</th></tr></thead>
                                 <tbody>
-                                    ${salesOrders.map(s => `
+                                    ${filteredOrders.map(s => `
                                         <tr>
                                             <td><strong>${s.order_number || s.sale_id || 'N/A'}</strong></td>
                                             <td>${s.customer_name || 'Unknown'}</td>
@@ -1980,21 +1748,18 @@
         // ============================================
         function showMySales(container) {
             if (!container) return;
-            let userSales = salesData;
-            if (currentUser && currentUser.role !== 'admin') {
-                userSales = userSales.filter(s => (s.recorded_by || s.created_by) === currentUser.username);
-            }
+            const userSales = getFilteredSales();
             const totalRevenue = userSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
 
             container.innerHTML = `
                 <div class="metrics-grid">
-                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value">${formatCurrency(totalRevenue)}</div><div class="label">Total Revenue</div></div>
-                    <div class="metric-card"><div class="indicator green"></div><div class="icon">📋</div><div class="value">${userSales.length}</div><div class="label">Transactions</div></div>
+                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value">${formatCurrency(totalRevenue)}</div><div class="label">My Total Revenue</div></div>
+                    <div class="metric-card"><div class="indicator green"></div><div class="icon">📋</div><div class="value">${userSales.length}</div><div class="label">My Transactions</div></div>
                     <div class="metric-card"><div class="indicator yellow"></div><div class="icon">📊</div><div class="value">${userSales.length > 0 ? formatCurrency(totalRevenue / userSales.length) : '$0.00'}</div><div class="label">Average Sale</div></div>
                     <div class="metric-card"><div class="indicator purple"></div><div class="icon">👤</div><div class="value">${currentUser ? currentUser.full_name : 'N/A'}</div><div class="label">Recorded By</div></div>
                 </div>
                 <div class="card">
-                    <div class="card-header"><h3>📋 Sales Details</h3><span class="link">Total: ${formatCurrency(totalRevenue)}</span></div>
+                    <div class="card-header"><h3>📋 My Sales Details</h3><span class="link">Total: ${formatCurrency(totalRevenue)}</span></div>
                     <div class="card-body">
                         ${userSales.length === 0 ? '<p style="text-align:center;color:#6B7280;padding:1rem 0;">No sales recorded.</p>' : ''}
                         <ul class="activity-list">
@@ -2383,11 +2148,12 @@
         debugLog('📡 API URL: ' + API_URL, 'info');
         debugLog('🔑 Default: admin / Admin@123', 'info');
         debugLog('🔄 Auto-refresh enabled every 15 seconds', 'info');
-        debugLog('📊 Showing ALL sales (no date filter)', 'info');
+        debugLog('👤 Role-based access: Admin sees all, Operator sees only own sales', 'info');
         
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
         console.log('📡 API URL:', API_URL);
         console.log('🔑 Default: admin / Admin@123');
+        console.log('💡 Role-based access: Admin = all data, Operator = only their sales');
         console.log('💡 Check the debug console below for real-time logs');
     </script>
 </body>
