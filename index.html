@@ -446,7 +446,7 @@
                 <div class="log-entry info">📡 API URL: <span id="debugApiUrl">Loading...</span></div>
                 <div class="log-entry info">🔄 Auto-refresh enabled every 15 seconds</div>
                 <div class="log-entry info">📊 Showing ALL sales (no date filter)</div>
-                <div class="log-entry info">👤 Role-based access: Admin sees all, Operator sees only their sales</div>
+                <div class="log-entry info">👑 Role-based access: Admin sees ALL, Operator sees only their sales</div>
             </div>
             
             <!-- Footer -->
@@ -1013,7 +1013,7 @@
         }
 
         // ============================================
-        // LOAD DATA - WITH FORCED REFRESH
+        // LOAD DATA - FIXED TO USE CORRECT ENDPOINTS
         // ============================================
         async function loadAllData() {
             debugLog('🔄 Loading all data...', 'info');
@@ -1111,36 +1111,18 @@
             }
         }
 
+        // ============================================
+        // LOAD SALES DATA - USING /recent ENDPOINT
+        // ============================================
         async function loadSalesData() {
             try {
                 const response = await fetch(API_URL + '/recent');
                 if (response.ok) {
                     const data = await response.json();
                     salesData = data || [];
-                    debugLog('✅ Loaded ' + salesData.length + ' recent sales from database', 'success');
+                    debugLog('✅ Loaded ' + salesData.length + ' recent sales from /recent', 'success');
                     if (salesData.length > 0) {
                         debugLog('📊 Sample sale: ' + JSON.stringify(salesData[0]), 'info');
-                    } else {
-                        // Try debug endpoint as fallback
-                        debugLog('⚠️ No sales in /recent, trying /debug/sales...', 'warning');
-                        const debugResponse = await fetch(API_URL + '/debug/sales');
-                        if (debugResponse.ok) {
-                            const debugData = await debugResponse.json();
-                            if (debugData.length > 0) {
-                                debugLog('✅ Found ' + debugData.length + ' sales in debug endpoint!', 'success');
-                                salesData = debugData.map(s => ({
-                                    sale_id: s.so_number,
-                                    customer_name: s.customer_name,
-                                    sale_date: s.order_date,
-                                    total_sales: s.total_amount,
-                                    recorded_by: 'system',
-                                    etl_processed: 1
-                                }));
-                                debugLog('📊 Converted ' + salesData.length + ' debug sales to salesData', 'info');
-                            } else {
-                                debugLog('❌ No sales found in debug endpoint either.', 'error');
-                            }
-                        }
                     }
                     updateSalesBadge();
                     updateDashboardMetrics();
@@ -1384,6 +1366,7 @@
                     debugLog('🔄 Forcing data refresh after sale...', 'info');
                     await loadAllData();
                     
+                    // Force refresh of sales data
                     try {
                         const directResponse = await fetch(API_URL + '/recent');
                         if (directResponse.ok) {
@@ -1419,19 +1402,13 @@
         async function debugSales() {
             debugLog('🐛 Debugging sales...', 'info');
             try {
-                const response = await fetch(API_URL + '/debug/sales');
+                const response = await fetch(API_URL + '/recent');
                 if (response.ok) {
                     const data = await response.json();
-                    debugLog('🔍 Debug sales (' + data.length + '): ' + JSON.stringify(data, null, 2), 'info');
-                    showToast('Found ' + data.length + ' sales in debug. Check console.', 'info');
-                    
-                    const recentResponse = await fetch(API_URL + '/recent');
-                    if (recentResponse.ok) {
-                        const recentData = await recentResponse.json();
-                        debugLog('📊 Recent sales (' + recentData.length + '): ' + JSON.stringify(recentData, null, 2), 'info');
-                    }
+                    debugLog('📊 Recent sales (' + data.length + '): ' + JSON.stringify(data, null, 2), 'info');
+                    showToast('Found ' + data.length + ' sales. Check console.', 'info');
                 } else {
-                    showToast('Debug endpoint failed: ' + response.status, 'error');
+                    showToast('Recent sales API failed: ' + response.status, 'error');
                 }
             } catch (e) {
                 showToast('Error: ' + e.message, 'error');
