@@ -445,7 +445,7 @@
                 <div class="log-entry info">🚀 Debug Console Started...</div>
                 <div class="log-entry info">📡 API URL: <span id="debugApiUrl">Loading...</span></div>
                 <div class="log-entry info">🔄 Auto-refresh enabled every 15 seconds</div>
-                <div class="log-entry info">📊 Showing ALL sales (no date filter)</div>
+                <div class="log-entry info">📊 Showing sales from last 24 hours</div>
                 <div class="log-entry info">👑 Role-based access: Admin sees ALL, Operator sees only their sales</div>
             </div>
             
@@ -706,7 +706,7 @@
     <div id="toast" class="toast" style="display: none;"></div>
 
     <!-- ============================================
-    JAVASCRIPT - COMPLETE WITH ROLE-BASED ACCESS
+    JAVASCRIPT - COMPLETE WITH ROLE-BASED ACCESS & LAST 24 HOURS FILTER
     ============================================ -->
     <script>
         // ============================================
@@ -1013,7 +1013,19 @@
         }
 
         // ============================================
-        // LOAD DATA - FIXED TO USE CORRECT ENDPOINTS
+        // HELPER: Check if a sale is within last 24 hours
+        // ============================================
+        function isWithinLast24Hours(dateStr) {
+            if (!dateStr) return false;
+            const saleDate = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - saleDate;
+            const diffHours = diffMs / (1000 * 60 * 60);
+            return diffHours <= 24;
+        }
+
+        // ============================================
+        // LOAD DATA
         // ============================================
         async function loadAllData() {
             debugLog('🔄 Loading all data...', 'info');
@@ -1111,9 +1123,6 @@
             }
         }
 
-        // ============================================
-        // LOAD SALES DATA - USING /recent ENDPOINT
-        // ============================================
         async function loadSalesData() {
             try {
                 const response = await fetch(API_URL + '/recent');
@@ -1138,21 +1147,29 @@
         }
 
         // ============================================
-        // ROLE-BASED FILTERING FUNCTIONS - ADMIN SEES ALL, OPERATOR SEES ONLY THEIR SALES
+        // ROLE-BASED FILTERING - LAST 24 HOURS
         // ============================================
         function getFilteredSalesData() {
             if (!currentUser) return [];
-            // Admin sees ALL sales
+            
+            // First filter by last 24 hours
+            let filtered = salesData.filter(s => {
+                const saleDate = s.sale_date || s.order_date;
+                return isWithinLast24Hours(saleDate);
+            });
+            
+            // Then filter by role
             if (currentUser.role === 'admin') {
-                debugLog('👑 Admin viewing ALL ' + salesData.length + ' sales', 'info');
-                return salesData;
+                debugLog('👑 Admin viewing ' + filtered.length + ' sales from last 24 hours', 'info');
+                return filtered;
             }
+            
             // Operator sees only their sales
-            const filtered = salesData.filter(s => {
+            filtered = filtered.filter(s => {
                 const recordedBy = s.recorded_by || s.created_by;
                 return recordedBy === currentUser.username;
             });
-            debugLog('👤 Operator ' + currentUser.username + ' viewing ' + filtered.length + ' of ' + salesData.length + ' sales', 'info');
+            debugLog('👤 Operator ' + currentUser.username + ' viewing ' + filtered.length + ' sales from last 24 hours', 'info');
             return filtered;
         }
 
@@ -1179,7 +1196,7 @@
             const revenueEl = document.getElementById('todayRevenue');
             const transactionsEl = document.getElementById('todayTransactions');
             if (revenueEl) revenueEl.textContent = formatCurrency(revenue);
-            if (transactionsEl) transactionsEl.textContent = filteredSales.length + ' total sales';
+            if (transactionsEl) transactionsEl.textContent = filteredSales.length + ' sales (last 24h)';
             
             const roleLabel = currentUser?.role === 'admin' ? '👑 Admin - All Sales' : '👤 Operator - My Sales';
             debugLog('📊 ' + roleLabel + ': ' + filteredSales.length + ' transactions, $' + revenue.toFixed(2), 'info');
@@ -1291,7 +1308,7 @@
         }
 
         // ============================================
-        // SUBMIT SALES ORDER - WITH ROLE-BASED RECORDING
+        // SUBMIT SALES ORDER
         // ============================================
         async function submitSalesOrder(event) {
             event.preventDefault();
@@ -1405,8 +1422,13 @@
                 const response = await fetch(API_URL + '/recent');
                 if (response.ok) {
                     const data = await response.json();
-                    debugLog('📊 Recent sales (' + data.length + '): ' + JSON.stringify(data, null, 2), 'info');
-                    showToast('Found ' + data.length + ' sales. Check console.', 'info');
+                    debugLog('📊 Recent sales (' + data.length + '):', 'info');
+                    data.forEach((s, i) => {
+                        debugLog('  ' + (i+1) + '. ' + (s.sale_id || s.order_number) + ' | ' + s.customer_name + ' | ' + formatCurrency(s.total_sales || s.total_amount) + ' | ' + (s.sale_date || s.order_date), 'info');
+                    });
+                    const last24 = data.filter(s => isWithinLast24Hours(s.sale_date || s.order_date));
+                    debugLog('📊 Sales in last 24 hours: ' + last24.length, 'success');
+                    showToast('Found ' + data.length + ' sales, ' + last24.length + ' in last 24 hours. Check console.', 'info');
                 } else {
                     showToast('Recent sales API failed: ' + response.status, 'error');
                 }
@@ -1787,11 +1809,11 @@
                 `;
             }
 
-            // Update subtitle with role info
-            const roleText = currentUser?.role === 'admin' ? '👑 Admin - Viewing ALL sales data' : '👤 Operator - Viewing your sales only';
+            // Update subtitle with role info and 24-hour notice
+            const roleText = currentUser?.role === 'admin' ? '👑 Admin - Viewing ALL sales' : '👤 Operator - Viewing your sales only';
             if (subtitle) {
                 const baseText = getGreeting() + '! Here\'s your business overview.';
-                subtitle.textContent = baseText + ' ' + roleText;
+                subtitle.textContent = baseText + ' ' + roleText + ' (Last 24 hours)';
             }
 
             switch(page) {
@@ -1842,7 +1864,7 @@
         }
 
         // ============================================
-        // PAGE: DASHBOARD - ROLE-BASED
+        // PAGE: DASHBOARD - LAST 24 HOURS
         // ============================================
         function showDashboard(container) {
             if (!container) return;
@@ -1854,7 +1876,7 @@
                 return status === 'low-stock' || status === 'out-of-stock';
             }).length;
             
-            // Use role-based filtering
+            // Use role-based filtering with last 24 hours
             const filteredSales = getFilteredSalesData();
             const revenue = filteredSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
             const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled').length;
@@ -1871,15 +1893,15 @@
                     <div class="quick-action" onclick="loadPage('my_sales')"><i class="fas fa-user-tie"></i><span class="label">My Sales</span></div>
                 </div>
                 <div class="metrics-grid">
-                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value" id="todayRevenue">${formatCurrency(revenue)}</div><div class="label">${roleLabel}</div><div class="trend up" id="todayTransactions">${filteredSales.length} transactions</div></div>
+                    <div class="metric-card"><div class="indicator blue"></div><div class="icon">💰</div><div class="value" id="todayRevenue">${formatCurrency(revenue)}</div><div class="label">${roleLabel} (Last 24h)</div><div class="trend up" id="todayTransactions">${filteredSales.length} transactions</div></div>
                     <div class="metric-card"><div class="indicator green"></div><div class="icon">📦</div><div class="value">${totalProducts}</div><div class="label">Total Products</div><div class="trend up">Active catalog</div></div>
                     <div class="metric-card"><div class="indicator yellow"></div><div class="icon">⚠️</div><div class="value">${lowStock}</div><div class="label">Low Stock Items</div><div class="trend down">${lowStock > 0 ? 'Need reorder' : 'All good'}</div></div>
                     <div class="metric-card"><div class="indicator red"></div><div class="icon">📋</div><div class="value" id="pendingPOsCount">${pendingPOs}</div><div class="label">Pending POs</div><div class="trend down">${pendingPOs > 0 ? 'Awaiting delivery' : 'None pending'}</div></div>
                 </div>
                 <div class="content-grid">
-                    <div class="card"><div class="card-header"><h3>📈 Sales Trend</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
+                    <div class="card"><div class="card-header"><h3>📈 Sales Trend (Last 7 Days)</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
                         <div class="card-body"><div style="height:200px;display:flex;align-items:flex-end;padding:0 1rem;gap:0.5rem;">${getChartBars()}</div></div></div>
-                    <div class="card"><div class="card-header"><h3>📋 Recent Orders</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
+                    <div class="card"><div class="card-header"><h3>📋 Recent Orders (Last 24h)</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
                         <div class="card-body"><ul class="activity-list"></ul></div></div>
                 </div>
             `;
@@ -1912,7 +1934,7 @@
         function getRecentOrders() {
             const filteredSales = getFilteredSalesData();
             let recent = filteredSales.slice(0, 5);
-            if (recent.length === 0) return '<li style="text-align:center;color:#6B7280;padding:1rem 0;">No orders found</li>';
+            if (recent.length === 0) return '<li style="text-align:center;color:#6B7280;padding:1rem 0;">No orders in the last 24 hours</li>';
             return recent.map(s => `
                 <li>
                     <div class="info">
@@ -2375,13 +2397,14 @@
         debugLog('📡 API URL: ' + API_URL, 'info');
         debugLog('🔑 Default: admin / Admin@123', 'info');
         debugLog('🔄 Auto-refresh enabled every 15 seconds', 'info');
-        debugLog('📊 Showing ALL sales (no date filter)', 'info');
-        debugLog('👑 Role-based access: Admin sees ALL sales, Operator sees only their sales', 'info');
+        debugLog('📊 Showing sales from last 24 hours', 'info');
+        debugLog('👑 Role-based access: Admin sees ALL, Operator sees only their sales', 'info');
         
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
         console.log('📡 API URL:', API_URL);
         console.log('🔑 Default: admin / Admin@123');
-        console.log('👑 Role-based access: Admin sees ALL sales, Operator sees only their sales');
+        console.log('👑 Role-based access: Admin sees ALL, Operator sees only their sales');
+        console.log('📊 Showing sales from last 24 hours');
         console.log('💡 Check the debug console below for real-time logs');
     </script>
 </body>
