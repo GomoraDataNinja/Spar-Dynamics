@@ -215,7 +215,7 @@ def get_sales_orders():
                 so.so_number as order_number,
                 c.customer_name,
                 so.order_date,
-                so.order_time,
+                CONVERT(VARCHAR, so.order_time, 108) as order_time,
                 so.total_amount,
                 so.status,
                 so.created_by as recorded_by
@@ -245,7 +245,7 @@ def get_recent_sales():
                 so.so_number as sale_id,
                 c.customer_name,
                 so.order_date as sale_date,
-                so.order_time as sale_time,
+                CONVERT(VARCHAR, so.order_time, 108) as sale_time,
                 so.total_amount as total_sales,
                 so.rewards_earned,
                 so.status,
