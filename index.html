@@ -210,6 +210,16 @@
         table td { padding: 0.5rem; border-bottom: 1px solid #f0f2f5; }
         table tr:hover { background: #f8f9fa; }
         
+        /* Delete button for POs */
+        .btn-delete { background: #dc3545; color: white; border: none; padding: 0.2rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem; transition: all 0.2s; }
+        .btn-delete:hover { background: #c82333; transform: scale(1.05); }
+        .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* Delete user button */
+        .btn-delete-user { background: #dc3545; color: white; border: none; padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.65rem; transition: all 0.2s; }
+        .btn-delete-user:hover { background: #c82333; }
+        .btn-delete-user:disabled { opacity: 0.5; cursor: not-allowed; }
+        
         .auto-refresh-indicator {
             display: inline-block;
             width: 10px;
@@ -706,7 +716,7 @@
     <div id="toast" class="toast" style="display: none;"></div>
 
     <!-- ============================================
-    JAVASCRIPT - COMPLETE WITH ROLE-BASED ACCESS & LAST 24 HOURS FILTER
+    JAVASCRIPT - COMPLETE WITH ALL FEATURES
     ============================================ -->
     <script>
         // ============================================
@@ -809,6 +819,10 @@
                     const container = document.getElementById('contentContainer');
                     if (container) showMySales(container);
                 }
+                if (currentPage === 'users') {
+                    const container = document.getElementById('contentContainer');
+                    if (container) showUsers(container);
+                }
                 updateSalesBadge();
             }).catch(() => {
                 isRefreshing = false;
@@ -837,19 +851,86 @@
             { id: 2, username: 'operator1', password: 'Pass123', full_name: 'John Operator', email: 'john@spar.com', role: 'operator' },
             { id: 3, username: 'operator2', password: 'Pass123', full_name: 'Jane Operator', email: 'jane@spar.com', role: 'operator' }
         ];
-        
+
         function loadUsers() {
             const saved = localStorage.getItem('spar_users');
             users = saved ? JSON.parse(saved) : DEFAULT_USERS;
             if (!saved) localStorage.setItem('spar_users', JSON.stringify(users));
         }
-        
+
         function saveUsers() { localStorage.setItem('spar_users', JSON.stringify(users)); }
+
         function addUser(userData) {
-            const newUser = { id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1, ...userData };
+            const newUser = {
+                id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1,
+                ...userData
+            };
             users.push(newUser);
             saveUsers();
             return newUser;
+        }
+
+        // ============================================
+        // DELETE USER - ADMIN ONLY
+        // ============================================
+        function deleteUser(username) {
+            if (!currentUser || currentUser.role !== 'admin') {
+                showToast('❌ Admin access required', 'error');
+                return;
+            }
+            if (username === currentUser.username) {
+                showToast('❌ You cannot delete yourself!', 'error');
+                return;
+            }
+            if (confirm('⚠️ Are you sure you want to delete user "' + username + '"? This action cannot be undone.')) {
+                users = users.filter(u => u.username !== username);
+                saveUsers();
+                showToast('✅ User "' + username + '" deleted successfully!', 'success');
+                loadPage('users');
+            }
+        }
+
+        // ============================================
+        // DELETE EMPTY PURCHASE ORDER - ADMIN ONLY
+        // ============================================
+        async function deleteEmptyPO(poNumber) {
+            if (!currentUser || currentUser.role !== 'admin') {
+                showToast('❌ Admin access required', 'error');
+                return;
+            }
+            
+            if (confirm('⚠️ Are you sure you want to delete Purchase Order "' + poNumber + '"? This action cannot be undone.')) {
+                try {
+                    debugLog('🗑️ Deleting empty PO: ' + poNumber, 'info');
+                    
+                    // First check if PO has items
+                    const linesResponse = await fetch(API_URL + '/purchase-orders/' + poNumber + '/lines');
+                    if (linesResponse.ok) {
+                        const lines = await linesResponse.json();
+                        if (lines.length > 0) {
+                            showToast('❌ Cannot delete PO with items. Please receive or remove items first.', 'error');
+                            return;
+                        }
+                    }
+                    
+                    // If no items, delete the PO
+                    const response = await fetch(API_URL + '/purchase-orders/' + poNumber, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        showToast('✅ Purchase Order "' + poNumber + '" deleted successfully!', 'success');
+                        await loadAllData();
+                        loadPage('purchase_orders');
+                    } else {
+                        const error = await response.json();
+                        showToast('❌ Failed to delete PO: ' + (error.error || 'Unknown error'), 'error');
+                    }
+                } catch (error) {
+                    debugLog('❌ Delete PO error: ' + error.message, 'error');
+                    showToast('❌ Cannot connect to server. Please check your connection.', 'error');
+                }
+            }
         }
 
         // ============================================
@@ -966,30 +1047,30 @@
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
             const errorEl = document.getElementById('loginError');
-            
+
             const user = users.find(u => u.username === username && u.password === password);
-            
+
             if (user) {
                 currentUser = user;
                 errorEl.textContent = '';
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('networkContainer').classList.add('hidden');
                 document.getElementById('mainApp').classList.add('active');
-                
+
                 document.getElementById('userName').textContent = user.full_name;
                 document.getElementById('userRole').textContent = user.role === 'admin' ? 'Administrator' : 'Operator';
                 document.getElementById('userAvatar').textContent = user.full_name.split(' ').map(n => n[0]).join('').toUpperCase();
-                
+
                 document.getElementById('adminMenu').style.display = user.role === 'admin' ? 'block' : 'none';
-                
+
                 debugLog('✅ User logged in: ' + user.full_name + ' (Role: ' + user.role.toUpperCase() + ')', 'success');
-                
+
                 setTimeout(() => {
                     loadAllData();
                     loadPage('dashboard');
                     startAutoRefresh();
                 }, 500);
-                
+
                 showToast('✅ Welcome, ' + user.full_name + '!', 'success');
             } else {
                 errorEl.textContent = '❌ Invalid username or password';
@@ -1151,20 +1232,17 @@
         // ============================================
         function getFilteredSalesData() {
             if (!currentUser) return [];
-            
-            // First filter by last 24 hours
+
             let filtered = salesData.filter(s => {
                 const saleDate = s.sale_date || s.order_date;
                 return isWithinLast24Hours(saleDate);
             });
-            
-            // Then filter by role
+
             if (currentUser.role === 'admin') {
                 debugLog('👑 Admin viewing ' + filtered.length + ' sales from last 24 hours', 'info');
                 return filtered;
             }
-            
-            // Operator sees only their sales
+
             filtered = filtered.filter(s => {
                 const recordedBy = s.recorded_by || s.created_by;
                 return recordedBy === currentUser.username;
@@ -1192,12 +1270,12 @@
             const revenue = filteredSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
             const badge = document.getElementById('salesBadge');
             if (badge) badge.textContent = filteredSales.length;
-            
+
             const revenueEl = document.getElementById('todayRevenue');
             const transactionsEl = document.getElementById('todayTransactions');
             if (revenueEl) revenueEl.textContent = formatCurrency(revenue);
             if (transactionsEl) transactionsEl.textContent = filteredSales.length + ' sales (last 24h)';
-            
+
             const roleLabel = currentUser?.role === 'admin' ? '👑 Admin - All Sales' : '👤 Operator - My Sales';
             debugLog('📊 ' + roleLabel + ': ' + filteredSales.length + ' transactions, $' + revenue.toFixed(2), 'info');
             return { count: filteredSales.length, revenue: revenue };
@@ -1224,7 +1302,7 @@
         function getStockStatus(stock, reorder) { if (stock <= 0) return 'out-of-stock'; if (stock <= reorder) return 'low-stock'; return 'in-stock'; }
         function getStockLabel(stock, reorder) { const s = getStockStatus(stock, reorder); return { 'in-stock': 'In Stock', 'low-stock': 'Low Stock', 'out-of-stock': 'Out of Stock' }[s] || 'Unknown'; }
 
-        function openModal(id) { 
+        function openModal(id) {
             const modal = document.getElementById(id);
             if (modal) {
                 modal.classList.add('active');
@@ -1233,8 +1311,8 @@
                 debugLog('❌ Modal not found: ' + id, 'error');
             }
         }
-        
-        function closeModal(id) { 
+
+        function closeModal(id) {
             const modal = document.getElementById(id);
             if (modal) {
                 modal.classList.remove('active');
@@ -1242,8 +1320,8 @@
         }
 
         document.querySelectorAll('.modal-overlay').forEach(overlay => {
-            overlay.addEventListener('click', function(e) { 
-                if (e.target === this) this.classList.remove('active'); 
+            overlay.addEventListener('click', function(e) {
+                if (e.target === this) this.classList.remove('active');
             });
         });
 
@@ -1308,7 +1386,7 @@
         }
 
         // ============================================
-        // SUBMIT SALES ORDER
+        // SUBMIT SALES ORDER - WITH AUTO-CLEAR FORM
         // ============================================
         async function submitSalesOrder(event) {
             event.preventDefault();
@@ -1377,13 +1455,52 @@
                     debugLog('✅ Sale recorded by ' + currentUser.username + '! Order: ' + result.order_number + ', Total: ' + result.total_amount, 'success');
                     showToast('✅ Sale recorded! Order: ' + result.order_number + ' | Total: ' + formatCurrency(result.total_amount), 'success');
                     closeModal('salesOrderModal');
+                    
+                    // ============================================
+                    // AUTO-CLEAR SALE FORM - NEW FEATURE
+                    // ============================================
+                    // Reset the form
                     document.getElementById('salesOrderForm').reset();
+                    
+                    // Clear all item rows except the first one
+                    const container = document.getElementById('soItemsContainer');
+                    const rows = container.querySelectorAll('.item-row');
+                    for (let i = rows.length - 1; i > 0; i--) {
+                        rows[i].remove();
+                    }
+                    
+                    // Reset the first row
+                    const firstSelect = document.getElementById('soProductId_0');
+                    if (firstSelect) {
+                        firstSelect.value = '';
+                        // Repopulate products
+                        products.forEach(p => {
+                            const opt = document.createElement('option');
+                            opt.value = p.id;
+                            opt.textContent = p.product_code + ' - ' + p.product_name + ' ($' + p.unit_price + ')';
+                            firstSelect.appendChild(opt);
+                        });
+                    }
+                    const firstQty = document.getElementById('soQty_0');
+                    if (firstQty) firstQty.value = 1;
+                    const firstPrice = document.getElementById('soPrice_0');
+                    if (firstPrice) firstPrice.value = '0.00';
+                    
+                    // Reset totals
                     updateSoTotals();
+                    
+                    // Reset item counter
+                    soItemCount = 1;
+                    
+                    debugLog('🧹 Sale form cleared and ready for next sale', 'info');
+                    
+                    // ============================================
+                    // END OF AUTO-CLEAR FORM
+                    // ============================================
                     
                     debugLog('🔄 Forcing data refresh after sale...', 'info');
                     await loadAllData();
                     
-                    // Force refresh of sales data
                     try {
                         const directResponse = await fetch(API_URL + '/recent');
                         if (directResponse.ok) {
@@ -1809,7 +1926,6 @@
                 `;
             }
 
-            // Update subtitle with role info and 24-hour notice
             const roleText = currentUser?.role === 'admin' ? '👑 Admin - Viewing ALL sales' : '👤 Operator - Viewing your sales only';
             if (subtitle) {
                 const baseText = getGreeting() + '! Here\'s your business overview.';
@@ -1876,7 +1992,6 @@
                 return status === 'low-stock' || status === 'out-of-stock';
             }).length;
             
-            // Use role-based filtering with last 24 hours
             const filteredSales = getFilteredSalesData();
             const revenue = filteredSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
             const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled').length;
@@ -2061,11 +2176,14 @@
         }
 
         // ============================================
-        // PAGE: PURCHASE ORDERS
+        // PAGE: PURCHASE ORDERS - WITH DELETE EMPTY PO (ADMIN ONLY)
         // ============================================
         function showPurchaseOrders(container) {
             if (!container) return;
             const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled');
+            
+            // Check if we have PO lines data
+            let poLinesData = {};
             
             container.innerHTML = `
                 <div class="card">
@@ -2076,7 +2194,7 @@
                         ${purchaseOrders.length === 0 ? '<p style="text-align:center;color:#6B7280;padding:1rem 0;">No purchase orders found.</p>' : ''}
                         <div class="table-container">
                             <table>
-                                <thead><tr><th>PO #</th><th>Supplier</th><th>Date</th><th>Expected</th><th>Total</th><th>Status</th></tr></thead>
+                                <thead><tr><th>PO #</th><th>Supplier</th><th>Date</th><th>Expected</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
                                 <tbody>
                                     ${purchaseOrders.map(p => `
                                         <tr>
@@ -2086,10 +2204,26 @@
                                             <td>${formatDate(p.expected_delivery_date)}</td>
                                             <td><strong>${formatCurrency(p.total_amount)}</strong></td>
                                             <td><span class="status-badge ${p.status === 'Received' ? 'received' : p.status === 'Partially Received' ? 'partial' : 'draft'}">${p.status || 'Draft'}</span></td>
+                                            <td>
+                                                ${currentUser?.role === 'admin' && p.status !== 'Received' && p.status !== 'Cancelled' ? `
+                                                    <button class="btn-delete" onclick="deleteEmptyPO('${p.po_number}')" title="Delete empty PO">
+                                                        <i class="fas fa-trash"></i> Delete
+                                                    </button>
+                                                ` : ''}
+                                                ${currentUser?.role === 'admin' && (p.status === 'Received' || p.status === 'Cancelled') ? `
+                                                    <span style="font-size:0.6rem;color:#6B7280;">${p.status}</span>
+                                                ` : ''}
+                                                ${currentUser?.role !== 'admin' ? `
+                                                    <span style="font-size:0.6rem;color:#6B7280;">-</span>
+                                                ` : ''}
+                                            </td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
                             </table>
+                        </div>
+                        <div style="margin-top:0.5rem;font-size:0.7rem;color:#6B7280;">
+                            💡 ${currentUser?.role === 'admin' ? 'Admin: Click "Delete" on any empty PO to remove it.' : 'Only Admins can delete POs.'}
                         </div>
                     </div>
                 </div>
@@ -2136,7 +2270,7 @@
         }
 
         // ============================================
-        // PAGE: USERS
+        // PAGE: USERS - WITH DELETE BUTTON (ADMIN ONLY)
         // ============================================
         function showUsers(container) {
             if (!container) return;
@@ -2145,20 +2279,49 @@
                 return;
             }
             container.innerHTML = `
-                <div class="card"><div class="card-header"><h3>👥 System Users</h3></div>
+                <div class="card">
+                    <div class="card-header"><h3>👥 System Users</h3>
+                        <span class="link">${users.length} users</span>
+                    </div>
                     <div class="card-body">
                         <div class="table-container">
                             <table>
-                                <thead><tr><th>User</th><th>Username</th><th>Email</th><th>Role</th></tr></thead>
-                                <tbody>${users.map(u => `
+                                <thead>
                                     <tr>
-                                        <td><strong>${u.full_name}</strong></td>
-                                        <td>${u.username}</td>
-                                        <td>${u.email}</td>
-                                        <td><span class="status-badge ${u.role === 'admin' ? 'confirmed' : 'processing'}">${u.role.toUpperCase()}</span></td>
+                                        <th>User</th>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Actions</th>
                                     </tr>
-                                `).join('')}</tbody>
+                                </thead>
+                                <tbody>
+                                    ${users.map(u => `
+                                        <tr>
+                                            <td><strong>${u.full_name}</strong></td>
+                                            <td>${u.username}</td>
+                                            <td>${u.email}</td>
+                                            <td>
+                                                <span class="status-badge ${u.role === 'admin' ? 'confirmed' : 'processing'}">
+                                                    ${u.role.toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                ${u.username !== currentUser.username ? `
+                                                    <button class="btn-delete-user" onclick="deleteUser('${u.username}')" title="Delete user">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                ` : `
+                                                    <span style="font-size:0.6rem;color:#6B7280;">(You)</span>
+                                                `}
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
                             </table>
+                        </div>
+                        <div style="margin-top:0.5rem;font-size:0.7rem;color:#6B7280;">
+                            💡 Click the trash icon to delete a user. You cannot delete yourself.
                         </div>
                     </div>
                 </div>
@@ -2399,12 +2562,18 @@
         debugLog('🔄 Auto-refresh enabled every 15 seconds', 'info');
         debugLog('📊 Showing sales from last 24 hours', 'info');
         debugLog('👑 Role-based access: Admin sees ALL, Operator sees only their sales', 'info');
+        debugLog('🗑️ Admin can delete users (except self)', 'info');
+        debugLog('🧹 Admin can delete empty POs', 'info');
+        debugLog('🧹 Sale form auto-clears after recording', 'info');
         
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
         console.log('📡 API URL:', API_URL);
         console.log('🔑 Default: admin / Admin@123');
         console.log('👑 Role-based access: Admin sees ALL, Operator sees only their sales');
         console.log('📊 Showing sales from last 24 hours');
+        console.log('🗑️ Admin can delete users (except self)');
+        console.log('🧹 Admin can delete empty POs');
+        console.log('🧹 Sale form auto-clears after recording');
         console.log('💡 Check the debug console below for real-time logs');
     </script>
 </body>
