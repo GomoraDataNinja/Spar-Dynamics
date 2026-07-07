@@ -218,6 +218,7 @@ def get_sales_orders():
                 CONVERT(VARCHAR, so.order_time, 108) as order_time,
                 so.total_amount,
                 so.status,
+                so.approval_status,
                 so.created_by as recorded_by
             FROM erp_sales_orders so
             LEFT JOIN erp_customers c ON so.customer_id = c.id
@@ -249,6 +250,7 @@ def get_recent_sales():
                 so.total_amount as total_sales,
                 so.rewards_earned,
                 so.status,
+                so.approval_status,
                 so.created_by as recorded_by,
                 1 as etl_processed
             FROM erp_sales_orders so
@@ -280,6 +282,7 @@ def get_purchase_orders():
                 po.order_date,
                 po.expected_delivery_date,
                 po.status,
+                po.approval_status,
                 po.total_amount
             FROM erp_purchase_orders po
             LEFT JOIN erp_suppliers s ON po.supplier_id = s.id
@@ -372,14 +375,14 @@ def create_sales_order():
             INSERT INTO erp_sales_orders (
                 so_number, customer_id, order_date, order_time,
                 subtotal, tax_amount, total_amount, rewards_earned,
-                status, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                status, approval_status, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         order_params = (
             order_number, customer_id,
             datetime.now().strftime('%Y-%m-%d'), datetime.now().strftime('%H:%M:%S'),
             subtotal, tax, total, rewards,
-            'Confirmed', data.get('recorded_by', 'system')
+            'Confirmed', 'Approved', data.get('recorded_by', 'system')
         )
         result = execute_command_via_cloudflare(insert_order_query, order_params)
         if not result.get('success', False):
@@ -474,15 +477,15 @@ def create_purchase_order():
             INSERT INTO erp_purchase_orders (
                 po_number, supplier_id, order_date,
                 expected_delivery_date, subtotal, tax_amount, total_amount,
-                status, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                status, approval_status, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         po_params = (
             po_number, supplier_id,
             datetime.now().strftime('%Y-%m-%d'),
             data.get('expected_delivery_date'),
             subtotal, tax, total,
-            'Draft', data.get('created_by', 'system')
+            'Draft', 'Pending', data.get('created_by', 'system')
         )
         result = execute_command_via_cloudflare(insert_po_query, po_params)
         if not result.get('success', False):
@@ -608,7 +611,7 @@ def receive_goods():
         # Update PO status
         update_po_query = """
             UPDATE erp_purchase_orders 
-            SET status = 'Received'
+            SET status = 'Received', approval_status = 'Approved'
             WHERE id = ?
         """
         execute_command_via_cloudflare(update_po_query, [po['id']])
@@ -623,6 +626,279 @@ def receive_goods():
     except Exception as e:
         logger.error(f"❌ Error receiving goods: {e}")
         traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: BANK ACCOUNTS PROXY - GET
+# ============================================
+
+@app.route('/bank-accounts', methods=['GET'])
+def get_bank_accounts_proxy():
+    """Proxy to get bank accounts"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        result = execute_query_via_cloudflare(
+            "SELECT id, account_name, account_number, bank_name, balance, currency, is_active FROM erp_bank_accounts WHERE is_active = 1 ORDER BY account_name"
+        )
+        return jsonify(result if result else []), 200
+    except Exception as e:
+        logger.error(f"❌ Error getting bank accounts: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: BANK BALANCE PROXY - GET
+# ============================================
+
+@app.route('/bank-balance', methods=['GET'])
+def get_bank_balance_proxy():
+    """Proxy to get total bank balance"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        result = execute_query_via_cloudflare(
+            "SELECT ISNULL(SUM(balance), 0) as total_balance FROM erp_bank_accounts WHERE is_active = 1"
+        )
+        total = result[0]['total_balance'] if result and len(result) > 0 else 0
+        return jsonify({"total_balance": total}), 200
+    except Exception as e:
+        logger.error(f"❌ Error getting bank balance: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: DOCUMENTS PROXY - GET
+# ============================================
+
+@app.route('/documents', methods=['GET'])
+def get_documents_proxy():
+    """Proxy to get documents"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        query = """
+            SELECT 
+                id,
+                document_name,
+                document_type,
+                status,
+                uploaded_by,
+                uploaded_at,
+                reference_id,
+                reference_type
+            FROM erp_documents
+            WHERE is_active = 1
+            ORDER BY uploaded_at DESC
+        """
+        result = execute_query_via_cloudflare(query)
+        return jsonify(result if result else []), 200
+    except Exception as e:
+        logger.error(f"❌ Error getting documents: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: INCOMING DOCUMENTS PROXY - GET
+# ============================================
+
+@app.route('/incoming-documents', methods=['GET'])
+def get_incoming_documents_proxy():
+    """Proxy to get incoming documents count"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        result = execute_query_via_cloudflare(
+            "SELECT COUNT(*) as count FROM erp_documents WHERE status = 'Pending' AND is_active = 1"
+        )
+        count = result[0]['count'] if result and len(result) > 0 else 0
+        return jsonify({"count": count}), 200
+    except Exception as e:
+        logger.error(f"❌ Error getting incoming documents: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: PAYMENTS PROXY - GET
+# ============================================
+
+@app.route('/payments', methods=['GET'])
+def get_payments_proxy():
+    """Proxy to get payments"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        query = """
+            SELECT 
+                id,
+                payment_number,
+                payment_date,
+                amount,
+                payment_method,
+                status,
+                reference,
+                created_by,
+                created_at
+            FROM erp_payments
+            ORDER BY created_at DESC
+        """
+        result = execute_query_via_cloudflare(query)
+        return jsonify(result if result else []), 200
+    except Exception as e:
+        logger.error(f"❌ Error getting payments: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: UNPROCESSED PAYMENTS PROXY - GET
+# ============================================
+
+@app.route('/unprocessed-payments', methods=['GET'])
+def get_unprocessed_payments_proxy():
+    """Proxy to get unprocessed payments count"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        result = execute_query_via_cloudflare(
+            "SELECT COUNT(*) as count FROM erp_payments WHERE status = 'Pending'"
+        )
+        count = result[0]['count'] if result and len(result) > 0 else 0
+        return jsonify({"count": count}), 200
+    except Exception as e:
+        logger.error(f"❌ Error getting unprocessed payments: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: OVERDUE POS PROXY - GET
+# ============================================
+
+@app.route('/overdue-pos', methods=['GET'])
+def get_overdue_pos_proxy():
+    """Proxy to get overdue purchase orders count"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        result = execute_query_via_cloudflare(
+            "SELECT COUNT(*) as overdue_count FROM erp_purchase_orders WHERE expected_delivery_date < CAST(GETDATE() AS DATE) AND status NOT IN ('Received', 'Cancelled')"
+        )
+        count = result[0]['overdue_count'] if result and len(result) > 0 else 0
+        return jsonify({"overdue_count": count}), 200
+    except Exception as e:
+        logger.error(f"❌ Error getting overdue POs: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: PENDING APPROVALS PROXY - GET
+# ============================================
+
+@app.route('/pending-approvals', methods=['GET'])
+def get_pending_approvals_proxy():
+    """Proxy to get pending approvals counts"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        result = execute_query_via_cloudflare(
+            "SELECT (SELECT COUNT(*) FROM erp_purchase_orders WHERE approval_status = 'Pending') as pending_pos, (SELECT COUNT(*) FROM erp_sales_orders WHERE approval_status = 'Pending') as pending_sos"
+        )
+        if result and len(result) > 0:
+            return jsonify({
+                "pending_pos": result[0]['pending_pos'],
+                "pending_sos": result[0]['pending_sos']
+            }), 200
+        return jsonify({"pending_pos": 0, "pending_sos": 0}), 200
+    except Exception as e:
+        logger.error(f"❌ Error getting pending approvals: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: APPROVE PURCHASE ORDER PROXY - POST
+# ============================================
+
+@app.route('/purchase-orders/<po_number>/approve', methods=['POST'])
+def approve_purchase_order_proxy(po_number):
+    """Proxy to approve a purchase order"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        # First check if PO exists
+        check_query = "SELECT id FROM erp_purchase_orders WHERE po_number = ?"
+        check_result = execute_query_via_cloudflare(check_query, [po_number])
+        if not check_result:
+            return jsonify({"error": "PO not found"}), 404
+        
+        # Approve the PO
+        update_query = """
+            UPDATE erp_purchase_orders 
+            SET approval_status = 'Approved', status = 'Confirmed'
+            WHERE po_number = ?
+        """
+        result = execute_command_via_cloudflare(update_query, [po_number])
+        if result.get('success', False):
+            return jsonify({"status": "success", "message": f"PO {po_number} approved"}), 200
+        else:
+            return jsonify({"error": "Failed to approve PO"}), 500
+    except Exception as e:
+        logger.error(f"❌ Error approving PO: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: REJECT PURCHASE ORDER PROXY - POST
+# ============================================
+
+@app.route('/purchase-orders/<po_number>/reject', methods=['POST'])
+def reject_purchase_order_proxy(po_number):
+    """Proxy to reject a purchase order"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        # First check if PO exists
+        check_query = "SELECT id FROM erp_purchase_orders WHERE po_number = ?"
+        check_result = execute_query_via_cloudflare(check_query, [po_number])
+        if not check_result:
+            return jsonify({"error": "PO not found"}), 404
+        
+        # Reject the PO
+        update_query = """
+            UPDATE erp_purchase_orders 
+            SET approval_status = 'Rejected', status = 'Cancelled'
+            WHERE po_number = ?
+        """
+        result = execute_command_via_cloudflare(update_query, [po_number])
+        if result.get('success', False):
+            return jsonify({"status": "success", "message": f"PO {po_number} rejected"}), 200
+        else:
+            return jsonify({"error": "Failed to reject PO"}), 500
+    except Exception as e:
+        logger.error(f"❌ Error rejecting PO: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# NEW: DELETE EMPTY PURCHASE ORDER PROXY - DELETE
+# ============================================
+
+@app.route('/purchase-orders/<po_number>', methods=['DELETE'])
+def delete_empty_purchase_order_proxy(po_number):
+    """Proxy to delete an empty purchase order"""
+    try:
+        if not CLOUDFLARE_API_URL:
+            return jsonify({"error": "Cloudflare not configured"}), 500
+        
+        # Forward the DELETE request to local server
+        url = f"{CLOUDFLARE_API_URL}/purchase-orders/{po_number}"
+        response = requests.delete(url, timeout=30)
+        
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        else:
+            error_msg = response.json() if response.text else {"error": f"Error from local server: {response.status_code}"}
+            return jsonify(error_msg), response.status_code
+    except Exception as e:
+        logger.error(f"❌ Error deleting PO: {e}")
         return jsonify({"error": str(e)}), 500
 
 # ============================================
@@ -653,8 +929,19 @@ def index():
             "sales_orders": "GET /sales-orders, POST /sales-orders",
             "purchase_orders": "GET /purchase-orders, POST /purchase-orders",
             "purchase_orders/lines": "GET /purchase-orders/<po_number>/lines",
+            "purchase_orders/<po_number>/approve": "POST /purchase-orders/<po_number>/approve",
+            "purchase_orders/<po_number>/reject": "POST /purchase-orders/<po_number>/reject",
+            "purchase_orders/<po_number>": "DELETE /purchase-orders/<po_number>",
             "goods_receipt": "POST /goods-receipt",
-            "recent": "GET /recent"
+            "recent": "GET /recent",
+            "bank-accounts": "GET /bank-accounts",
+            "bank-balance": "GET /bank-balance",
+            "documents": "GET /documents",
+            "incoming-documents": "GET /incoming-documents",
+            "payments": "GET /payments",
+            "unprocessed-payments": "GET /unprocessed-payments",
+            "overdue-pos": "GET /overdue-pos",
+            "pending-approvals": "GET /pending-approvals"
         }
     })
 
@@ -677,7 +964,18 @@ if __name__ == '__main__':
     print("   GET  /purchase-orders")
     print("   POST /purchase-orders")
     print("   GET  /purchase-orders/<po_number>/lines")
+    print("   POST /purchase-orders/<po_number>/approve")
+    print("   POST /purchase-orders/<po_number>/reject")
+    print("   DELETE /purchase-orders/<po_number>")
     print("   POST /goods-receipt")
     print("   GET  /recent")
+    print("   GET  /bank-accounts")
+    print("   GET  /bank-balance")
+    print("   GET  /documents")
+    print("   GET  /incoming-documents")
+    print("   GET  /payments")
+    print("   GET  /unprocessed-payments")
+    print("   GET  /overdue-pos")
+    print("   GET  /pending-approvals")
     print("=" * 70)
     app.run(host='0.0.0.0', port=port, debug=False)
