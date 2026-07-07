@@ -141,6 +141,9 @@
         .status-badge.in-stock { background: #d4edda; color: #155724; }
         .status-badge.low-stock { background: #fff3cd; color: #856404; }
         .status-badge.out-of-stock { background: #f8d7da; color: #721c24; }
+        .status-badge.approved { background: #d4edda; color: #155724; }
+        .status-badge.rejected { background: #f8d7da; color: #721c24; }
+        .status-badge.pending { background: #fff3cd; color: #856404; }
         
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
         .modal-overlay.active { display: flex; }
@@ -192,9 +195,6 @@
         .product-card .stock .qty.out-of-stock { color: #dc3545; }
         .product-card .stock .price { font-size: 0.8rem; color: #6B7280; }
         .product-card .stock .stock-badge { padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.6rem; font-weight: 600; display: inline-block; }
-        .product-card .stock .stock-badge.in-stock { background: #d4edda; color: #155724; }
-        .product-card .stock .stock-badge.low-stock { background: #fff3cd; color: #856404; }
-        .product-card .stock .stock-badge.out-of-stock { background: #f8d7da; color: #721c24; }
         
         .filter-bar { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
         .filter-bar input, .filter-bar select { padding: 0.4rem 0.75rem; border: 1px solid #dadce0; border-radius: 8px; font-size: 0.85rem; font-family: 'Inter', sans-serif; background: white; }
@@ -210,15 +210,18 @@
         table td { padding: 0.5rem; border-bottom: 1px solid #f0f2f5; }
         table tr:hover { background: #f8f9fa; }
         
-        /* Delete button for POs */
         .btn-delete { background: #dc3545; color: white; border: none; padding: 0.2rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem; transition: all 0.2s; }
-        .btn-delete:hover { background: #c82333; transform: scale(1.05); }
+        .btn-delete:hover { background: #c82333; }
         .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        /* Delete user button */
         .btn-delete-user { background: #dc3545; color: white; border: none; padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.65rem; transition: all 0.2s; }
         .btn-delete-user:hover { background: #c82333; }
-        .btn-delete-user:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-approve { background: #28a745; color: white; border: none; padding: 0.2rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem; transition: all 0.2s; margin-right: 0.2rem; }
+        .btn-approve:hover { background: #218838; }
+        
+        .btn-reject { background: #dc3545; color: white; border: none; padding: 0.2rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem; transition: all 0.2s; }
+        .btn-reject:hover { background: #c82333; }
         
         .auto-refresh-indicator {
             display: inline-block;
@@ -457,6 +460,7 @@
                 <div class="log-entry info">🔄 Auto-refresh enabled every 15 seconds</div>
                 <div class="log-entry info">📊 Showing sales from last 24 hours</div>
                 <div class="log-entry info">👑 Role-based access: Admin sees ALL, Operator sees only their sales</div>
+                <div class="log-entry info">🏦 New features: Bank Accounts, Documents, Payments, Approvals</div>
             </div>
             
             <!-- Footer -->
@@ -468,7 +472,7 @@
     </div>
 
     <!-- ============================================
-    MODALS - New Sale, PO, Goods Receipt, Product, User
+    MODALS
     ============================================ -->
     <div class="modal-overlay" id="salesOrderModal">
         <div class="modal">
@@ -841,6 +845,7 @@
         let currentPage = 'dashboard';
         let soItemCount = 1;
         let poItemCount = 1;
+        let dashboardData = {};
         const startTime = Date.now();
 
         // ============================================
@@ -870,9 +875,6 @@
             return newUser;
         }
 
-        // ============================================
-        // DELETE USER - ADMIN ONLY
-        // ============================================
         function deleteUser(username) {
             if (!currentUser || currentUser.role !== 'admin') {
                 showToast('❌ Admin access required', 'error');
@@ -891,7 +893,7 @@
         }
 
         // ============================================
-        // DELETE EMPTY PURCHASE ORDER - ADMIN ONLY
+        // DELETE EMPTY PO
         // ============================================
         async function deleteEmptyPO(poNumber) {
             if (!currentUser || currentUser.role !== 'admin') {
@@ -903,7 +905,6 @@
                 try {
                     debugLog('🗑️ Deleting empty PO: ' + poNumber, 'info');
                     
-                    // First check if PO has items
                     const linesResponse = await fetch(API_URL + '/purchase-orders/' + poNumber + '/lines');
                     if (linesResponse.ok) {
                         const lines = await linesResponse.json();
@@ -913,7 +914,6 @@
                         }
                     }
                     
-                    // If no items, delete the PO
                     const response = await fetch(API_URL + '/purchase-orders/' + poNumber, {
                         method: 'DELETE'
                     });
@@ -930,6 +930,53 @@
                     debugLog('❌ Delete PO error: ' + error.message, 'error');
                     showToast('❌ Cannot connect to server. Please check your connection.', 'error');
                 }
+            }
+        }
+
+        // ============================================
+        // APPROVE/REJECT PO
+        // ============================================
+        async function approvePO(poNumber) {
+            if (!currentUser || currentUser.role !== 'admin') {
+                showToast('❌ Admin access required', 'error');
+                return;
+            }
+            try {
+                const response = await fetch(API_URL + '/purchase-orders/' + poNumber + '/approve', {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    showToast('✅ PO ' + poNumber + ' approved successfully!', 'success');
+                    await loadAllData();
+                    loadPage('purchase_orders');
+                } else {
+                    const error = await response.json();
+                    showToast('❌ Failed to approve PO: ' + (error.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showToast('❌ Error approving PO: ' + error.message, 'error');
+            }
+        }
+
+        async function rejectPO(poNumber) {
+            if (!currentUser || currentUser.role !== 'admin') {
+                showToast('❌ Admin access required', 'error');
+                return;
+            }
+            try {
+                const response = await fetch(API_URL + '/purchase-orders/' + poNumber + '/reject', {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    showToast('✅ PO ' + poNumber + ' rejected successfully!', 'success');
+                    await loadAllData();
+                    loadPage('purchase_orders');
+                } else {
+                    const error = await response.json();
+                    showToast('❌ Failed to reject PO: ' + (error.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showToast('❌ Error rejecting PO: ' + error.message, 'error');
             }
         }
 
@@ -1114,7 +1161,8 @@
                 loadProducts(),
                 loadSalesOrders(),
                 loadPurchaseOrders(),
-                loadSalesData()
+                loadSalesData(),
+                loadDashboardMetrics()
             ]);
             updateDashboardMetrics();
             debugLog('✅ All data loaded successfully', 'success');
@@ -1126,7 +1174,7 @@
                 if (response.ok) {
                     const data = await response.json();
                     products = data || [];
-                    debugLog('✅ Loaded ' + products.length + ' products from database', 'success');
+                    debugLog('✅ Loaded ' + products.length + ' products', 'success');
                     if (document.getElementById('productList')) {
                         renderProducts(products);
                     }
@@ -1135,7 +1183,7 @@
                     return;
                 }
                 products = [];
-                debugLog('⚠️ No products found in database', 'warning');
+                debugLog('⚠️ No products found', 'warning');
                 if (document.getElementById('productList')) {
                     renderProducts(products);
                 }
@@ -1173,7 +1221,7 @@
                     salesOrders = data || [];
                     const badge = document.getElementById('orderBadge');
                     if (badge) badge.textContent = salesOrders.length;
-                    debugLog('✅ Loaded ' + salesOrders.length + ' sales orders from database', 'success');
+                    debugLog('✅ Loaded ' + salesOrders.length + ' sales orders', 'success');
                     return;
                 }
                 salesOrders = [];
@@ -1191,10 +1239,10 @@
                     purchaseOrders = data || [];
                     const badge = document.getElementById('poBadge');
                     if (badge) {
-                        const pending = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled');
+                        const pending = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled' && p.approval_status !== 'Rejected');
                         badge.textContent = pending.length;
                     }
-                    debugLog('✅ Loaded ' + purchaseOrders.length + ' purchase orders from database', 'success');
+                    debugLog('✅ Loaded ' + purchaseOrders.length + ' purchase orders', 'success');
                     return;
                 }
                 purchaseOrders = [];
@@ -1210,12 +1258,11 @@
                 if (response.ok) {
                     const data = await response.json();
                     salesData = data || [];
-                    debugLog('✅ Loaded ' + salesData.length + ' recent sales from /recent', 'success');
+                    debugLog('✅ Loaded ' + salesData.length + ' recent sales', 'success');
                     if (salesData.length > 0) {
                         debugLog('📊 Sample sale: ' + JSON.stringify(salesData[0]), 'info');
                     }
                     updateSalesBadge();
-                    updateDashboardMetrics();
                     return;
                 }
                 salesData = [];
@@ -1228,7 +1275,38 @@
         }
 
         // ============================================
-        // ROLE-BASED FILTERING - LAST 24 HOURS
+        // LOAD DASHBOARD METRICS
+        // ============================================
+        async function loadDashboardMetrics() {
+            try {
+                const endpoints = {
+                    bankBalance: '/bank-balance',
+                    overduePos: '/overdue-pos',
+                    incomingDocs: '/incoming-documents',
+                    pendingApprovals: '/pending-approvals',
+                    unprocessedPayments: '/unprocessed-payments'
+                };
+
+                for (const [key, endpoint] of Object.entries(endpoints)) {
+                    try {
+                        const response = await fetch(API_URL + endpoint);
+                        if (response.ok) {
+                            const data = await response.json();
+                            dashboardData[key] = data;
+                            debugLog('✅ Loaded ' + key + ': ' + JSON.stringify(data), 'success');
+                        }
+                    } catch (e) {
+                        dashboardData[key] = { error: e.message };
+                        debugLog('⚠️ Could not load ' + key + ': ' + e.message, 'warning');
+                    }
+                }
+            } catch (error) {
+                debugLog('❌ Error loading dashboard metrics: ' + error.message, 'error');
+            }
+        }
+
+        // ============================================
+        // ROLE-BASED FILTERING
         // ============================================
         function getFilteredSalesData() {
             if (!currentUser) return [];
@@ -1239,16 +1317,13 @@
             });
 
             if (currentUser.role === 'admin') {
-                debugLog('👑 Admin viewing ' + filtered.length + ' sales from last 24 hours', 'info');
                 return filtered;
             }
 
-            filtered = filtered.filter(s => {
+            return filtered.filter(s => {
                 const recordedBy = s.recorded_by || s.created_by;
                 return recordedBy === currentUser.username;
             });
-            debugLog('👤 Operator ' + currentUser.username + ' viewing ' + filtered.length + ' sales from last 24 hours', 'info');
-            return filtered;
         }
 
         function getFilteredSalesOrders() {
@@ -1386,7 +1461,7 @@
         }
 
         // ============================================
-        // SUBMIT SALES ORDER - WITH AUTO-CLEAR FORM
+        // SUBMIT SALES ORDER
         // ============================================
         async function submitSalesOrder(event) {
             event.preventDefault();
@@ -1456,24 +1531,16 @@
                     showToast('✅ Sale recorded! Order: ' + result.order_number + ' | Total: ' + formatCurrency(result.total_amount), 'success');
                     closeModal('salesOrderModal');
                     
-                    // ============================================
-                    // AUTO-CLEAR SALE FORM - NEW FEATURE
-                    // ============================================
-                    // Reset the form
+                    // Auto-clear form
                     document.getElementById('salesOrderForm').reset();
-                    
-                    // Clear all item rows except the first one
                     const container = document.getElementById('soItemsContainer');
                     const rows = container.querySelectorAll('.item-row');
                     for (let i = rows.length - 1; i > 0; i--) {
                         rows[i].remove();
                     }
-                    
-                    // Reset the first row
                     const firstSelect = document.getElementById('soProductId_0');
                     if (firstSelect) {
                         firstSelect.value = '';
-                        // Repopulate products
                         products.forEach(p => {
                             const opt = document.createElement('option');
                             opt.value = p.id;
@@ -1485,32 +1552,11 @@
                     if (firstQty) firstQty.value = 1;
                     const firstPrice = document.getElementById('soPrice_0');
                     if (firstPrice) firstPrice.value = '0.00';
-                    
-                    // Reset totals
                     updateSoTotals();
-                    
-                    // Reset item counter
                     soItemCount = 1;
                     
-                    debugLog('🧹 Sale form cleared and ready for next sale', 'info');
-                    
-                    // ============================================
-                    // END OF AUTO-CLEAR FORM
-                    // ============================================
-                    
-                    debugLog('🔄 Forcing data refresh after sale...', 'info');
+                    debugLog('🧹 Sale form cleared', 'info');
                     await loadAllData();
-                    
-                    try {
-                        const directResponse = await fetch(API_URL + '/recent');
-                        if (directResponse.ok) {
-                            const directData = await directResponse.json();
-                            salesData = directData || [];
-                            debugLog('✅ Direct fetch loaded ' + salesData.length + ' sales', 'success');
-                        }
-                    } catch (e) {
-                        debugLog('⚠️ Direct fetch failed: ' + e.message, 'warning');
-                    }
                     
                     if (currentPage === 'dashboard') {
                         const container = document.getElementById('contentContainer');
@@ -1531,7 +1577,7 @@
         }
 
         // ============================================
-        // DEBUG SALES FUNCTION
+        // DEBUG SALES
         // ============================================
         async function debugSales() {
             debugLog('🐛 Debugging sales...', 'info');
@@ -1705,7 +1751,7 @@
                 if (response.ok) {
                     const data = await response.json();
                     purchaseOrders = data || [];
-                    const pending = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled');
+                    const pending = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled' && p.approval_status !== 'Rejected');
                     pending.forEach(po => {
                         const opt = document.createElement('option');
                         opt.value = po.po_number;
@@ -1980,7 +2026,7 @@
         }
 
         // ============================================
-        // PAGE: DASHBOARD - LAST 24 HOURS
+        // PAGE: DASHBOARD
         // ============================================
         function showDashboard(container) {
             if (!container) return;
@@ -1994,7 +2040,13 @@
             
             const filteredSales = getFilteredSalesData();
             const revenue = filteredSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
-            const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled').length;
+            const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled' && p.approval_status !== 'Rejected').length;
+
+            const bankBalance = dashboardData.bankBalance?.total_balance || 0;
+            const overduePos = dashboardData.overduePos?.overdue_count || 0;
+            const incomingDocs = dashboardData.incomingDocs?.count || 0;
+            const pendingApprovals = dashboardData.pendingApprovals || { pending_pos: 0, pending_sos: 0 };
+            const unprocessedPayments = dashboardData.unprocessedPayments?.count || 0;
 
             const roleLabel = currentUser?.role === 'admin' ? '👑 Admin - All Sales' : '👤 Operator - My Sales';
 
@@ -2013,11 +2065,92 @@
                     <div class="metric-card"><div class="indicator yellow"></div><div class="icon">⚠️</div><div class="value">${lowStock}</div><div class="label">Low Stock Items</div><div class="trend down">${lowStock > 0 ? 'Need reorder' : 'All good'}</div></div>
                     <div class="metric-card"><div class="indicator red"></div><div class="icon">📋</div><div class="value" id="pendingPOsCount">${pendingPOs}</div><div class="label">Pending POs</div><div class="trend down">${pendingPOs > 0 ? 'Awaiting delivery' : 'None pending'}</div></div>
                 </div>
+                <div class="metrics-grid">
+                    <div class="metric-card"><div class="indicator purple"></div><div class="icon">🏦</div><div class="value">${formatCurrency(bankBalance)}</div><div class="label">Cash Balance</div><div class="trend up">Total bank balance</div></div>
+                    <div class="metric-card"><div class="indicator red"></div><div class="icon">📋</div><div class="value">${overduePos}</div><div class="label">Overdue POs</div><div class="trend down">${overduePos > 0 ? 'Past due date' : 'All current'}</div></div>
+                    <div class="metric-card"><div class="indicator yellow"></div><div class="icon">📄</div><div class="value">${incomingDocs}</div><div class="label">Incoming Docs</div><div class="trend down">${incomingDocs > 0 ? 'Pending processing' : 'None pending'}</div></div>
+                    <div class="metric-card"><div class="indicator yellow"></div><div class="icon">⏳</div><div class="value">${unprocessedPayments}</div><div class="label">Unprocessed Payments</div><div class="trend down">${unprocessedPayments > 0 ? 'Awaiting processing' : 'All processed'}</div></div>
+                </div>
                 <div class="content-grid">
                     <div class="card"><div class="card-header"><h3>📈 Sales Trend (Last 7 Days)</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
                         <div class="card-body"><div style="height:200px;display:flex;align-items:flex-end;padding:0 1rem;gap:0.5rem;">${getChartBars()}</div></div></div>
                     <div class="card"><div class="card-header"><h3>📋 Recent Orders (Last 24h)</h3><span class="link" onclick="loadPage('sales_orders')">View all →</span></div>
                         <div class="card-body"><ul class="activity-list"></ul></div></div>
+                </div>
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <h3>📋 Activities</h3>
+                        <span class="link">View all →</span>
+                    </div>
+                    <div class="card-body">
+                        <ul class="activity-list">
+                            <li>
+                                <div class="info">
+                                    <div class="title">Overdue Purchase Documents</div>
+                                    <div class="meta">Purchase orders past due date</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-weight:600;color:#dc3545;">${overduePos}</div>
+                                    <span class="status-badge overdue">Overdue</span>
+                                    <button onclick="loadPage('purchase_orders')" style="background:none;border:none;color:#0052A5;cursor:pointer;font-size:0.7rem;">See more →</button>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="info">
+                                    <div class="title">Cash Accounts Balance</div>
+                                    <div class="meta">Total bank balance</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-weight:600;color:#28a745;">${formatCurrency(bankBalance)}</div>
+                                    <button onclick="loadPage('settings')" style="background:none;border:none;color:#0052A5;cursor:pointer;font-size:0.7rem;">See more →</button>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="info">
+                                    <div class="title">New Incoming Documents</div>
+                                    <div class="meta">Documents pending processing</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-weight:600;color:#f39c12;">${incomingDocs}</div>
+                                    <span class="status-badge processing">Pending</span>
+                                    <button onclick="debugSales()" style="background:none;border:none;color:#0052A5;cursor:pointer;font-size:0.7rem;">See more →</button>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="info">
+                                    <div class="title">POS Pending Approval</div>
+                                    <div class="meta">Purchase orders waiting for approval</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-weight:600;color:#f39c12;">${pendingApprovals.pending_pos || 0}</div>
+                                    <span class="status-badge processing">Pending</span>
+                                    <button onclick="loadPage('purchase_orders')" style="background:none;border:none;color:#0052A5;cursor:pointer;font-size:0.7rem;">See more →</button>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="info">
+                                    <div class="title">SOs Pending Approval</div>
+                                    <div class="meta">Sales orders waiting for approval</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-weight:600;color:#f39c12;">${pendingApprovals.pending_sos || 0}</div>
+                                    <span class="status-badge processing">Pending</span>
+                                    <button onclick="loadPage('sales_orders')" style="background:none;border:none;color:#0052A5;cursor:pointer;font-size:0.7rem;">See more →</button>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="info">
+                                    <div class="title">Unprocessed Payments</div>
+                                    <div class="meta">Payments awaiting processing</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-weight:600;color:#dc3545;">${unprocessedPayments}</div>
+                                    <span class="status-badge draft">Pending</span>
+                                    <button onclick="showNotification()" style="background:none;border:none;color:#0052A5;cursor:pointer;font-size:0.7rem;">See more →</button>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             `;
             
@@ -2058,7 +2191,7 @@
                     </div>
                     <div style="text-align:right;">
                         <div style="font-weight:600;">${formatCurrency(s.total_sales || s.total_amount)}</div>
-                        <span class="status-badge ${s.etl_processed === 1 ? 'synced' : 'processing'}">${s.etl_processed === 1 ? 'Synced' : 'Processing'}</span>
+                        <span class="status-badge ${s.approval_status === 'Pending' ? 'processing' : 'synced'}">${s.approval_status || 'Synced'}</span>
                     </div>
                 </li>
             `).join('');
@@ -2071,7 +2204,7 @@
         }
 
         // ============================================
-        // PAGE: SALES ORDERS - ROLE-BASED
+        // PAGE: SALES ORDERS
         // ============================================
         function showSalesOrders(container) {
             if (!container) return;
@@ -2087,7 +2220,7 @@
                         ${filteredOrders.length === 0 ? '<p style="text-align:center;color:#6B7280;padding:1rem 0;">No sales orders found.</p>' : ''}
                         <div class="table-container">
                             <table>
-                                <thead><tr><th>Order #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>Recorded By</th></tr></thead>
+                                <thead><tr><th>Order #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>Approval</th><th>Recorded By</th></tr></thead>
                                 <tbody>
                                     ${filteredOrders.map(s => `
                                         <tr>
@@ -2096,6 +2229,7 @@
                                             <td>${formatDate(s.order_date || s.sale_date)}</td>
                                             <td><strong>${formatCurrency(s.total_amount || s.total_sales)}</strong></td>
                                             <td><span class="status-badge ${s.status === 'Confirmed' ? 'confirmed' : 'draft'}">${s.status || 'Draft'}</span></td>
+                                            <td><span class="status-badge ${s.approval_status === 'Pending' ? 'processing' : s.approval_status === 'Approved' ? 'approved' : 'draft'}">${s.approval_status || 'Approved'}</span></td>
                                             <td>${s.recorded_by || 'system'}</td>
                                         </tr>
                                     `).join('')}
@@ -2135,7 +2269,7 @@
                                     </div>
                                     <div style="text-align:right;">
                                         <div style="font-weight:600;">${formatCurrency(s.total_sales || s.total_amount)}</div>
-                                        <span class="status-badge ${s.etl_processed === 1 ? 'synced' : 'processing'}">${s.etl_processed === 1 ? 'Synced' : 'Processing'}</span>
+                                        <span class="status-badge ${s.approval_status === 'Pending' ? 'processing' : 'synced'}">${s.approval_status || 'Synced'}</span>
                                     </div>
                                 </li>
                             `).join('')}
@@ -2176,14 +2310,11 @@
         }
 
         // ============================================
-        // PAGE: PURCHASE ORDERS - WITH DELETE EMPTY PO (ADMIN ONLY)
+        // PAGE: PURCHASE ORDERS
         // ============================================
         function showPurchaseOrders(container) {
             if (!container) return;
-            const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled');
-            
-            // Check if we have PO lines data
-            let poLinesData = {};
+            const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled' && p.approval_status !== 'Rejected');
             
             container.innerHTML = `
                 <div class="card">
@@ -2194,7 +2325,7 @@
                         ${purchaseOrders.length === 0 ? '<p style="text-align:center;color:#6B7280;padding:1rem 0;">No purchase orders found.</p>' : ''}
                         <div class="table-container">
                             <table>
-                                <thead><tr><th>PO #</th><th>Supplier</th><th>Date</th><th>Expected</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+                                <thead><tr><th>PO #</th><th>Supplier</th><th>Date</th><th>Expected</th><th>Total</th><th>Status</th><th>Approval</th><th>Actions</th></tr></thead>
                                 <tbody>
                                     ${purchaseOrders.map(p => `
                                         <tr>
@@ -2204,14 +2335,20 @@
                                             <td>${formatDate(p.expected_delivery_date)}</td>
                                             <td><strong>${formatCurrency(p.total_amount)}</strong></td>
                                             <td><span class="status-badge ${p.status === 'Received' ? 'received' : p.status === 'Partially Received' ? 'partial' : 'draft'}">${p.status || 'Draft'}</span></td>
+                                            <td><span class="status-badge ${p.approval_status === 'Pending' ? 'processing' : p.approval_status === 'Approved' ? 'approved' : p.approval_status === 'Rejected' ? 'rejected' : 'draft'}">${p.approval_status || 'Pending'}</span></td>
                                             <td>
-                                                ${currentUser?.role === 'admin' && p.status !== 'Received' && p.status !== 'Cancelled' ? `
-                                                    <button class="btn-delete" onclick="deleteEmptyPO('${p.po_number}')" title="Delete empty PO">
-                                                        <i class="fas fa-trash"></i> Delete
+                                                ${currentUser?.role === 'admin' && p.approval_status === 'Pending' ? `
+                                                    <button class="btn-approve" onclick="approvePO('${p.po_number}')" title="Approve PO">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <button class="btn-reject" onclick="rejectPO('${p.po_number}')" title="Reject PO">
+                                                        <i class="fas fa-times"></i>
                                                     </button>
                                                 ` : ''}
-                                                ${currentUser?.role === 'admin' && (p.status === 'Received' || p.status === 'Cancelled') ? `
-                                                    <span style="font-size:0.6rem;color:#6B7280;">${p.status}</span>
+                                                ${currentUser?.role === 'admin' && p.status !== 'Received' && p.status !== 'Cancelled' && p.approval_status !== 'Rejected' ? `
+                                                    <button class="btn-delete" onclick="deleteEmptyPO('${p.po_number}')" title="Delete empty PO">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
                                                 ` : ''}
                                                 ${currentUser?.role !== 'admin' ? `
                                                     <span style="font-size:0.6rem;color:#6B7280;">-</span>
@@ -2223,7 +2360,7 @@
                             </table>
                         </div>
                         <div style="margin-top:0.5rem;font-size:0.7rem;color:#6B7280;">
-                            💡 ${currentUser?.role === 'admin' ? 'Admin: Click "Delete" on any empty PO to remove it.' : 'Only Admins can delete POs.'}
+                            💡 ${currentUser?.role === 'admin' ? 'Admin: Approve/Reject POs. Delete empty POs.' : 'Only Admins can approve/reject/delete POs.'}
                         </div>
                     </div>
                 </div>
@@ -2235,7 +2372,7 @@
         // ============================================
         function showGoodsReceipt(container) {
             if (!container) return;
-            const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled');
+            const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled' && p.approval_status !== 'Rejected');
             
             container.innerHTML = `
                 <div class="card">
@@ -2270,7 +2407,7 @@
         }
 
         // ============================================
-        // PAGE: USERS - WITH DELETE BUTTON (ADMIN ONLY)
+        // PAGE: USERS
         // ============================================
         function showUsers(container) {
             if (!container) return;
@@ -2562,18 +2699,17 @@
         debugLog('🔄 Auto-refresh enabled every 15 seconds', 'info');
         debugLog('📊 Showing sales from last 24 hours', 'info');
         debugLog('👑 Role-based access: Admin sees ALL, Operator sees only their sales', 'info');
+        debugLog('🏦 New features: Bank Accounts, Documents, Payments, Approvals', 'info');
         debugLog('🗑️ Admin can delete users (except self)', 'info');
         debugLog('🧹 Admin can delete empty POs', 'info');
-        debugLog('🧹 Sale form auto-clears after recording', 'info');
+        debugLog('✅ Admin can approve/reject POs', 'info');
         
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
         console.log('📡 API URL:', API_URL);
         console.log('🔑 Default: admin / Admin@123');
         console.log('👑 Role-based access: Admin sees ALL, Operator sees only their sales');
         console.log('📊 Showing sales from last 24 hours');
-        console.log('🗑️ Admin can delete users (except self)');
-        console.log('🧹 Admin can delete empty POs');
-        console.log('🧹 Sale form auto-clears after recording');
+        console.log('🏦 New features: Bank Accounts, Documents, Payments, Approvals');
         console.log('💡 Check the debug console below for real-time logs');
     </script>
 </body>
