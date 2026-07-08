@@ -10,6 +10,10 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
+    <!-- html2canvas + jsPDF for PDF download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: #202124; height: 100vh; overflow: hidden; }
@@ -823,7 +827,7 @@
             <div class="form-actions">
                 <button class="btn btn-secondary" onclick="closeModal('receiptModal')">Close</button>
                 <button class="btn btn-primary" onclick="printReceipt()">
-                    <i class="fas fa-print"></i> Print
+                    <i class="fas fa-print"></i> Print / PDF
                 </button>
                 <button class="btn btn-success" onclick="downloadReceipt()">
                     <i class="fas fa-file-pdf"></i> Download PDF
@@ -1250,17 +1254,62 @@
             }, 1000);
         }
 
-        function downloadReceipt() {
+        // ============================================
+        // DOWNLOAD PDF - NEW IMPLEMENTATION
+        // ============================================
+        async function downloadReceipt() {
             if (!currentReceiptOrder) {
                 showToast('❌ No receipt to download', 'error');
                 return;
             }
-            
+
+            // Get the receipt container element
+            const receiptElement = document.querySelector('#receiptContent .receipt-container');
+            if (!receiptElement) {
+                showToast('❌ Receipt content not found', 'error');
+                return;
+            }
+
             try {
-                showToast('📄 Generating receipt...', 'info');
-                showReceipt(currentReceiptOrder);
+                showToast('⏳ Generating PDF...', 'info');
+
+                // Capture the receipt as a canvas
+                const canvas = await html2canvas(receiptElement, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+
+                // Create PDF (A4 portrait)
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                let heightLeft = pdfHeight;
+                let position = 0;
+
+                // Add image to PDF
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+                heightLeft -= pdfHeight;
+
+                // If content overflows, add more pages (unlikely for a receipt)
+                while (heightLeft > 0) {
+                    position = heightLeft - pdfHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+                    heightLeft -= pdfHeight;
+                }
+
+                // Download PDF
+                pdf.save(`Receipt_${currentReceiptOrder}.pdf`);
+                showToast('✅ PDF downloaded successfully!', 'success');
             } catch (error) {
-                showToast('❌ Error: ' + error.message, 'error');
+                console.error('PDF generation error:', error);
+                showToast('❌ Failed to generate PDF: ' + error.message, 'error');
             }
         }
 
