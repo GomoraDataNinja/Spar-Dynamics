@@ -3,14 +3,13 @@ SPAR ETL Receiver - Render Version
 Complete API with all features
 """
 
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from datetime import datetime
 import logging
 import os
 import random
 import requests
 import traceback
-from io import BytesIO
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -263,7 +262,7 @@ def create_purchase_order():
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# GOODS RECEIPT
+# GOODS RECEIPT - POST
 # ============================================
 
 @app.route('/goods-receipt', methods=['POST'])
@@ -338,7 +337,7 @@ def get_bank_accounts_proxy():
         return jsonify([]), 200
 
 # ============================================
-# RECEIPT
+# RECEIPT - GET
 # ============================================
 
 @app.route('/receipt/<order_number>', methods=['GET'])
@@ -350,13 +349,6 @@ def get_receipt_proxy(order_number):
         url = f"{CLOUDFLARE_API_URL}/receipt/{order_number}"
         response = requests.get(url, timeout=60)
         if response.status_code == 200:
-            if response.headers.get('content-type') == 'application/pdf':
-                return send_file(
-                    BytesIO(response.content),
-                    as_attachment=True,
-                    download_name=f'receipt_{order_number}.pdf',
-                    mimetype='application/pdf'
-                )
             return jsonify(response.json()), 200
         return jsonify({"error": "Failed to generate receipt"}), response.status_code
     except Exception as e:
