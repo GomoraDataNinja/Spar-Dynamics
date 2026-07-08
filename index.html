@@ -226,100 +226,38 @@
         .btn-receipt { background: #0052A5; color: white; border: none; padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.65rem; transition: all 0.2s; }
         .btn-receipt:hover { background: #004080; }
         
-        .auto-refresh-indicator {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 8px;
-            animation: pulse 2s infinite;
-        }
-        .auto-refresh-indicator.active { background: #28a745; }
-        .auto-refresh-indicator.inactive { background: #dc3545; }
-        .auto-refresh-indicator.checking { background: #f39c12; }
-        
-        @keyframes pulse {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(0.8); }
-            100% { opacity: 1; transform: scale(1); }
-        }
-        
-        .debug-console {
-            background: #1a1a2e;
-            color: #00ff41;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            padding: 10px;
-            border-radius: 8px;
-            max-height: 150px;
-            overflow-y: auto;
-            margin-top: 10px;
-            border: 1px solid #333;
-        }
-        .debug-console .log-entry {
-            padding: 2px 0;
-            border-bottom: 1px solid #222;
-        }
-        .debug-console .log-entry.error { color: #ff4444; }
-        .debug-console .log-entry.success { color: #44ff44; }
-        .debug-console .log-entry.warning { color: #ffaa44; }
-        .debug-console .log-entry.info { color: #44aaff; }
-        
-        /* Receipt styles */
         .receipt-container {
             max-width: 500px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 15px;
             background: white;
-            border-radius: 12px;
+            border-radius: 8px;
         }
         .receipt-container .receipt-header {
             text-align: center;
             border-bottom: 2px solid #e8eaed;
-            padding-bottom: 15px;
-            margin-bottom: 15px;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
         }
         .receipt-container .receipt-header h2 {
             color: #002B5C;
-            font-size: 1.3rem;
+            font-size: 1.2rem;
         }
         .receipt-container .receipt-header p {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: #6B7280;
+            margin: 2px 0;
         }
         .receipt-container .receipt-info {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 0.3rem;
-            font-size: 0.8rem;
-            margin-bottom: 10px;
+            gap: 0.2rem;
+            font-size: 0.75rem;
+            margin-bottom: 8px;
         }
         .receipt-container .receipt-info .label {
             font-weight: 600;
             color: #6B7280;
-        }
-        .receipt-container .receipt-table {
-            width: 100%;
-            font-size: 0.8rem;
-            border-collapse: collapse;
-            margin: 10px 0;
-        }
-        .receipt-container .receipt-table th {
-            text-align: left;
-            padding: 0.3rem;
-            border-bottom: 1px solid #e8eaed;
-            color: #6B7280;
-            font-weight: 600;
-        }
-        .receipt-container .receipt-table td {
-            padding: 0.3rem;
-            border-bottom: 1px solid #f0f2f5;
-        }
-        .receipt-container .receipt-table .text-right {
-            text-align: right;
-        }
-        .receipt-container .receipt-table .text-center {
-            text-align: center;
         }
         .receipt-container .receipt-totals {
             border-top: 2px solid #e8eaed;
@@ -343,17 +281,57 @@
         .receipt-container .receipt-rewards {
             color: #28a745;
             font-weight: 600;
-            margin: 10px 0;
+            margin: 8px 0;
             text-align: right;
+            font-size: 0.85rem;
         }
         .receipt-container .receipt-footer {
             text-align: center;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: #6B7280;
-            border-top: 2px solid #e8eaed;
-            padding-top: 10px;
-            margin-top: 10px;
+            border-top: 1px solid #e8eaed;
+            padding-top: 8px;
+            margin-top: 8px;
         }
+        
+        .auto-refresh-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        .auto-refresh-indicator.active { background: #28a745; }
+        .auto-refresh-indicator.inactive { background: #dc3545; }
+        .auto-refresh-indicator.checking { background: #f39c12; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
+        .debug-console {
+            background: #1a1a2e;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            padding: 8px;
+            border-radius: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+            margin-top: 10px;
+            border: 1px solid #333;
+        }
+        .debug-console .log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid #222;
+        }
+        .debug-console .log-entry.error { color: #ff4444; }
+        .debug-console .log-entry.success { color: #44ff44; }
+        .debug-console .log-entry.warning { color: #ffaa44; }
+        .debug-console .log-entry.info { color: #44aaff; }
         
         @media (max-width: 1200px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } .quick-actions { grid-template-columns: repeat(3, 1fr); } .content-grid { grid-template-columns: 1fr; } }
         @media (max-width: 768px) { .sidebar { width: 60px; } .sidebar .menu-item span, .sidebar .section-title { display: none; } .sidebar .menu-item { padding: 0.8rem 1.2rem; justify-content: center; } .sidebar .menu-item i { font-size: 1.2rem; } .main-content { margin-left: 60px; } .top-nav .nav-actions .search-box { min-width: 120px; } .metrics-grid { grid-template-columns: 1fr; } .quick-actions { grid-template-columns: repeat(2, 1fr); } .top-nav .user-profile .name, .top-nav .user-profile .role { display: none; } .modal .form-row { grid-template-columns: 1fr; } .item-row { grid-template-columns: 1fr 0.8fr; } .product-grid { grid-template-columns: 1fr; } .filter-bar { flex-direction: column; } .login-box { padding: 2rem; } .page-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; } }
@@ -553,7 +531,6 @@
                 <div class="log-entry info">🔄 Auto-refresh enabled every 15 seconds</div>
                 <div class="log-entry info">📊 Showing sales from last 24 hours</div>
                 <div class="log-entry info">👑 Role-based access: Admin sees ALL, Operator sees only their sales</div>
-                <div class="log-entry info">🏦 New features: Bank Accounts, Documents, Payments, Approvals</div>
                 <div class="log-entry info">⭐ Rewards System: Customers earn 2% on every purchase</div>
                 <div class="log-entry info">🧾 PDF Receipt Generation: Download/print receipts</div>
             </div>
@@ -839,7 +816,7 @@
     <div id="toast" class="toast" style="display: none;"></div>
 
     <!-- ============================================
-    JAVASCRIPT - COMPLETE WITH ALL FEATURES
+    JAVASCRIPT - COMPLETE
     ============================================ -->
     <script>
         // ============================================
@@ -1108,148 +1085,62 @@
                 debugLog('🧾 Fetching receipt for: ' + orderNumber, 'info');
                 currentReceiptOrder = orderNumber;
                 
-                // Get order details
-                const orderResponse = await fetch(API_URL + '/sales-orders');
-                const orders = await orderResponse.json();
-                const order = orders.find(o => o.order_number === orderNumber);
-                
-                if (!order) {
-                    showToast('❌ Order not found', 'error');
-                    return;
+                const response = await fetch(API_URL + '/receipt/' + orderNumber);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'success' && data.receipt) {
+                        const receipt = data.receipt;
+                        const rewardsEarned = receipt.rewards_earned || (receipt.total_amount * 0.02);
+                        
+                        let receiptHTML = `
+                            <div class="receipt-container">
+                                <div class="receipt-header">
+                                    <h2>SPAR Dynamics 365</h2>
+                                    <p>Yellowcob Enterprises Pvt Ltd</p>
+                                    <p style="font-size:0.7rem;">123 Main Street, Harare, Zimbabwe</p>
+                                    <hr>
+                                </div>
+                                <div class="receipt-info">
+                                    <span class="label">Order #:</span>
+                                    <span>${receipt.order_number}</span>
+                                    <span class="label">Date:</span>
+                                    <span>${receipt.order_date}</span>
+                                    <span class="label">Time:</span>
+                                    <span>${receipt.order_time}</span>
+                                    <span class="label">Customer:</span>
+                                    <span>${receipt.customer_name}</span>
+                                </div>
+                                <hr>
+                                <div style="text-align:center;padding:10px 0;color:#6B7280;font-size:0.8rem;">
+                                    <i class="fas fa-receipt"></i> Receipt generated successfully
+                                </div>
+                                <div class="receipt-totals">
+                                    <div class="total-row final">
+                                        <span>Total Amount:</span>
+                                        <span style="font-weight:700;font-size:1.3rem;">${formatCurrency(receipt.total_amount)}</span>
+                                    </div>
+                                </div>
+                                <div class="receipt-rewards">
+                                    ⭐ Rewards Earned: ${rewardsEarned.toFixed(2)} pts
+                                </div>
+                                <div class="receipt-footer">
+                                    <p>Thank you for shopping with SPAR!</p>
+                                    <p style="font-size:0.6rem;">Generated on: ${new Date().toLocaleString()}</p>
+                                </div>
+                            </div>
+                        `;
+                        
+                        document.getElementById('receiptContent').innerHTML = receiptHTML;
+                        openModal('receiptModal');
+                    } else {
+                        showToast('❌ Failed to load receipt', 'error');
+                    }
+                } else {
+                    showToast('❌ Failed to fetch receipt', 'error');
                 }
-                
-                // Build receipt HTML
-                const receiptHTML = buildReceiptHTML(order);
-                document.getElementById('receiptContent').innerHTML = receiptHTML;
-                openModal('receiptModal');
             } catch (error) {
                 showToast('❌ Error: ' + error.message, 'error');
                 debugLog('❌ Receipt error: ' + error.message, 'error');
-            }
-        }
-
-        function buildReceiptHTML(order) {
-            const subtotal = order.total_amount / 1.155;
-            const tax = order.total_amount - subtotal;
-            const rewardsEarned = order.total_amount * 0.02;
-            
-            return `
-                <div class="receipt-container">
-                    <div class="receipt-header">
-                        <h2>SPAR Dynamics 365</h2>
-                        <p>Yellowcob Enterprises Pvt Ltd</p>
-                        <p style="font-size:0.7rem;">123 Main Street, Harare, Zimbabwe</p>
-                        <p style="font-size:0.7rem;">Tel: +263 242 123 456</p>
-                    </div>
-                    
-                    <div class="receipt-info">
-                        <span class="label">Order #:</span>
-                        <span>${order.order_number}</span>
-                        <span class="label">Date:</span>
-                        <span>${formatDate(order.order_date)}</span>
-                        <span class="label">Time:</span>
-                        <span>${order.order_time || ''}</span>
-                        <span class="label">Customer:</span>
-                        <span>${order.customer_name || 'Unknown'}</span>
-                        <span class="label">Cashier:</span>
-                        <span>${order.recorded_by || 'system'}</span>
-                    </div>
-                    
-                    <hr style="margin:10px 0;">
-                    
-                    <table class="receipt-table">
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th class="text-center">Qty</th>
-                                <th class="text-right">Price</th>
-                                <th class="text-right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="receiptItems">
-                            <tr>
-                                <td colspan="4" style="text-align:center;color:#6B7280;padding:10px 0;">
-                                    <i class="fas fa-spinner fa-spin"></i> Loading items...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    
-                    <div class="receipt-totals">
-                        <div class="total-row">
-                            <span>Subtotal:</span>
-                            <span>${formatCurrency(subtotal)}</span>
-                        </div>
-                        <div class="total-row">
-                            <span>VAT (15.5%):</span>
-                            <span>${formatCurrency(tax)}</span>
-                        </div>
-                        <div class="total-row final">
-                            <span>TOTAL:</span>
-                            <span>${formatCurrency(order.total_amount)}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="receipt-rewards">
-                        ⭐ Rewards Earned: ${rewardsEarned.toFixed(2)} pts
-                        ${order.rewards_balance !== undefined ? `| Total Balance: ${order.rewards_balance.toFixed(2)} pts` : ''}
-                    </div>
-                    
-                    <div class="receipt-footer">
-                        <p>Thank you for shopping with SPAR!</p>
-                        <p>This is a system-generated receipt</p>
-                        <p style="font-size:0.6rem;">Generated on: ${new Date().toLocaleString()}</p>
-                    </div>
-                </div>
-            `;
-        }
-
-        async function loadReceiptItems(orderNumber) {
-            try {
-                // Try to get items from the order
-                const response = await fetch(API_URL + '/recent');
-                const sales = await response.json();
-                const sale = sales.find(s => s.sale_id === orderNumber);
-                
-                const tbody = document.querySelector('#receiptItems');
-                if (!tbody) return;
-                
-                if (sale && sale.items && sale.items.length > 0) {
-                    tbody.innerHTML = sale.items.map(item => `
-                        <tr>
-                            <td>${item.product_name || 'Unknown'}</td>
-                            <td class="text-center">${item.quantity}</td>
-                            <td class="text-right">${formatCurrency(item.unit_price)}</td>
-                            <td class="text-right">${formatCurrency(item.quantity * item.unit_price)}</td>
-                        </tr>
-                    `).join('');
-                } else {
-                    // Try to get from sales orders
-                    const orderResponse = await fetch(API_URL + '/sales-orders');
-                    const orders = await orderResponse.json();
-                    const order = orders.find(o => o.order_number === orderNumber);
-                    
-                    if (order && order.items) {
-                        tbody.innerHTML = order.items.map(item => `
-                            <tr>
-                                <td>${item.product_name || 'Unknown'}</td>
-                                <td class="text-center">${item.quantity}</td>
-                                <td class="text-right">${formatCurrency(item.unit_price)}</td>
-                                <td class="text-right">${formatCurrency(item.quantity * item.unit_price)}</td>
-                            </tr>
-                        `).join('');
-                    } else {
-                        tbody.innerHTML = `
-                            <tr>
-                                <td colspan="4" style="text-align:center;color:#6B7280;padding:10px 0;">
-                                    No items found for this order
-                                </td>
-                            </tr>
-                        `;
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading receipt items:', error);
             }
         }
 
@@ -1275,16 +1166,11 @@
                             .receipt-header p { font-size: 0.8rem; color: #6B7280; margin: 2px 0; }
                             .receipt-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; font-size: 0.8rem; margin-bottom: 10px; }
                             .receipt-info .label { font-weight: 600; color: #6B7280; }
-                            .receipt-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; margin: 10px 0; }
-                            .receipt-table th { text-align: left; padding: 0.3rem; border-bottom: 1px solid #e8eaed; color: #6B7280; }
-                            .receipt-table td { padding: 0.3rem; border-bottom: 1px solid #f0f2f5; }
-                            .receipt-table .text-right { text-align: right; }
-                            .receipt-table .text-center { text-align: center; }
                             .receipt-totals { border-top: 2px solid #e8eaed; margin-top: 10px; padding-top: 10px; }
                             .receipt-totals .total-row { display: flex; justify-content: space-between; padding: 0.2rem 0; font-size: 0.9rem; }
-                            .receipt-totals .total-row.final { font-size: 1.1rem; font-weight: 700; color: #002B5C; border-top: 2px solid #002B5C; padding-top: 0.5rem; margin-top: 0.3rem; }
-                            .receipt-rewards { color: #28a745; font-weight: 600; margin: 10px 0; text-align: right; }
-                            .receipt-footer { text-align: center; font-size: 0.7rem; color: #6B7280; border-top: 2px solid #e8eaed; padding-top: 10px; margin-top: 10px; }
+                            .receipt-totals .total-row.final { font-size: 1.2rem; font-weight: 700; color: #002B5C; border-top: 2px solid #002B5C; padding-top: 0.5rem; margin-top: 0.3rem; }
+                            .receipt-rewards { color: #28a745; font-weight: 600; margin: 10px 0; text-align: right; font-size: 0.9rem; }
+                            .receipt-footer { text-align: center; font-size: 0.7rem; color: #6B7280; border-top: 1px solid #e8eaed; padding-top: 10px; margin-top: 10px; }
                             hr { border: none; border-top: 1px solid #e8eaed; margin: 10px 0; }
                             .no-print { display: none; }
                             @media print { .no-print { display: none; } }
@@ -1301,12 +1187,6 @@
             `);
             printWindow.document.close();
             
-            // Load items after the document is ready
-            setTimeout(() => {
-                loadReceiptItems(currentReceiptOrder);
-            }, 500);
-            
-            // Auto-print after a delay
             setTimeout(() => {
                 printWindow.print();
             }, 1000);
@@ -1327,17 +1207,6 @@
                 showToast('❌ Error downloading PDF: ' + error.message, 'error');
             }
         }
-
-        // Override the openModal function to load receipt items when receipt modal opens
-        const originalOpenModal = openModal;
-        openModal = function(id) {
-            originalOpenModal(id);
-            if (id === 'receiptModal' && currentReceiptOrder) {
-                setTimeout(() => {
-                    loadReceiptItems(currentReceiptOrder);
-                }, 300);
-            }
-        };
 
         // ============================================
         // NETWORK ANIMATION
@@ -1888,7 +1757,9 @@
                     const result = await response.json();
                     debugLog('✅ Sale recorded by ' + currentUser.username + '! Order: ' + result.order_number + ', Total: ' + result.total_amount, 'success');
                     showToast('✅ Sale recorded! Order: ' + result.order_number + ' | Total: ' + formatCurrency(result.total_amount), 'success');
-                    showToast('⭐ Rewards Earned: ' + result.rewards_earned.toFixed(2) + ' pts | Total Rewards: ' + result.customer_rewards_total.toFixed(2) + ' pts', 'info');
+                    if (result.rewards_earned) {
+                        showToast('⭐ Rewards Earned: ' + result.rewards_earned.toFixed(2) + ' pts', 'info');
+                    }
                     
                     closeModal('salesOrderModal');
                     
@@ -2205,26 +2076,7 @@
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
             }
         }
-<!-- ============================================
-RECEIPT MODAL
-============================================ -->
-<div class="modal-overlay" id="receiptModal">
-    <div class="modal" style="max-width: 550px;">
-        <div class="modal-header">
-            <h2>🧾 Receipt</h2>
-            <button class="close-btn" onclick="closeModal('receiptModal')">×</button>
-        </div>
-        <div id="receiptContent">
-            <!-- Receipt content will be loaded here -->
-        </div>
-        <div class="form-actions">
-            <button class="btn btn-secondary" onclick="closeModal('receiptModal')">Close</button>
-            <button class="btn btn-primary" onclick="window.print()">
-                <i class="fas fa-print"></i> Print
-            </button>
-        </div>
-    </div>
-</div>
+
         // ============================================
         // PRODUCT FUNCTIONS
         // ============================================
@@ -2422,7 +2274,6 @@ RECEIPT MODAL
             const revenue = filteredSales.reduce((sum, s) => sum + parseFloat(s.total_sales || s.total_amount || 0), 0);
             const pendingPOs = purchaseOrders.filter(p => p.status !== 'Received' && p.status !== 'Cancelled' && p.approval_status !== 'Rejected').length;
 
-            // Get dynamic data
             const bankBalance = dashboardData.bankBalance?.available_cash || dashboardData.bankBalance?.cash_balance || 0;
             const overduePos = dashboardData.overduePos?.overdue_count || 0;
             const incomingDocs = dashboardData.incomingDocs?.count || 0;
@@ -3102,8 +2953,7 @@ RECEIPT MODAL
         debugLog('📊 Showing sales from last 24 hours', 'info');
         debugLog('👑 Role-based access: Admin sees ALL, Operator sees only their sales', 'info');
         debugLog('⭐ Rewards System: Customers earn 2% on every purchase', 'info');
-        debugLog('🧾 PDF Receipt Generation: Download/print receipts', 'info');
-        debugLog('🏦 Dynamic Cash Balance: Auto-updates with transactions', 'info');
+        debugLog('🧾 Receipt Generation: Download/print receipts', 'info');
         
         console.log('🏢 SPAR Dynamics 365 v2.0 Loaded!');
         console.log('📡 API URL:', API_URL);
@@ -3111,7 +2961,7 @@ RECEIPT MODAL
         console.log('👑 Role-based access: Admin sees ALL, Operator sees only their sales');
         console.log('📊 Showing sales from last 24 hours');
         console.log('⭐ Rewards System: Customers earn 2% on every purchase');
-        console.log('🧾 PDF Receipt Generation: Download/print receipts');
+        console.log('🧾 Receipt Generation: Download/print receipts');
         console.log('💡 Check the debug console below for real-time logs');
     </script>
 </body>
