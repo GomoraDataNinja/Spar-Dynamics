@@ -2205,7 +2205,26 @@
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
             }
         }
-
+<!-- ============================================
+RECEIPT MODAL
+============================================ -->
+<div class="modal-overlay" id="receiptModal">
+    <div class="modal" style="max-width: 550px;">
+        <div class="modal-header">
+            <h2>🧾 Receipt</h2>
+            <button class="close-btn" onclick="closeModal('receiptModal')">×</button>
+        </div>
+        <div id="receiptContent">
+            <!-- Receipt content will be loaded here -->
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-secondary" onclick="closeModal('receiptModal')">Close</button>
+            <button class="btn btn-primary" onclick="window.print()">
+                <i class="fas fa-print"></i> Print
+            </button>
+        </div>
+    </div>
+</div>
         // ============================================
         // PRODUCT FUNCTIONS
         // ============================================
