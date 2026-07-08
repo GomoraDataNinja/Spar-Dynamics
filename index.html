@@ -259,6 +259,28 @@
             font-weight: 600;
             color: #6B7280;
         }
+        .receipt-container .receipt-table {
+            width: 100%;
+            font-size: 0.75rem;
+            border-collapse: collapse;
+            margin: 8px 0;
+        }
+        .receipt-container .receipt-table th {
+            text-align: left;
+            padding: 0.3rem;
+            border-bottom: 1px solid #e8eaed;
+            color: #6B7280;
+        }
+        .receipt-container .receipt-table td {
+            padding: 0.3rem;
+            border-bottom: 1px solid #f0f2f5;
+        }
+        .receipt-container .receipt-table .text-right {
+            text-align: right;
+        }
+        .receipt-container .receipt-table .text-center {
+            text-align: center;
+        }
         .receipt-container .receipt-totals {
             border-top: 2px solid #e8eaed;
             margin-top: 10px;
@@ -1092,6 +1114,26 @@
                         const receipt = data.receipt;
                         const rewardsEarned = receipt.rewards_earned || (receipt.total_amount * 0.02);
                         
+                        let itemsHTML = '';
+                        if (receipt.lines && receipt.lines.length > 0) {
+                            itemsHTML = receipt.lines.map(item => `
+                                <tr>
+                                    <td>${item.product_name}</td>
+                                    <td class="text-center">${item.quantity}</td>
+                                    <td class="text-right">${formatCurrency(item.unit_price)}</td>
+                                    <td class="text-right">${formatCurrency(item.line_total)}</td>
+                                </tr>
+                            `).join('');
+                        } else {
+                            itemsHTML = `
+                                <tr>
+                                    <td colspan="4" style="text-align:center;color:#6B7280;padding:10px 0;">
+                                        No items found
+                                    </td>
+                                </tr>
+                            `;
+                        }
+                        
                         let receiptHTML = `
                             <div class="receipt-container">
                                 <div class="receipt-header">
@@ -1111,13 +1153,23 @@
                                     <span>${receipt.customer_name}</span>
                                 </div>
                                 <hr>
-                                <div style="text-align:center;padding:10px 0;color:#6B7280;font-size:0.8rem;">
-                                    <i class="fas fa-receipt"></i> Receipt generated successfully
-                                </div>
+                                <table class="receipt-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th class="text-center">Qty</th>
+                                            <th class="text-right">Price</th>
+                                            <th class="text-right">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${itemsHTML}
+                                    </tbody>
+                                </table>
                                 <div class="receipt-totals">
                                     <div class="total-row final">
                                         <span>Total Amount:</span>
-                                        <span style="font-weight:700;font-size:1.3rem;">${formatCurrency(receipt.total_amount)}</span>
+                                        <span style="font-weight:700;font-size:1.2rem;">${formatCurrency(receipt.total_amount)}</span>
                                     </div>
                                 </div>
                                 <div class="receipt-rewards">
@@ -1133,10 +1185,11 @@
                         document.getElementById('receiptContent').innerHTML = receiptHTML;
                         openModal('receiptModal');
                     } else {
-                        showToast('❌ Failed to load receipt', 'error');
+                        showToast('❌ Failed to load receipt: ' + (data.message || 'Unknown error'), 'error');
                     }
                 } else {
-                    showToast('❌ Failed to fetch receipt', 'error');
+                    const error = await response.json();
+                    showToast('❌ Failed to fetch receipt: ' + (error.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
                 showToast('❌ Error: ' + error.message, 'error');
@@ -1166,6 +1219,11 @@
                             .receipt-header p { font-size: 0.8rem; color: #6B7280; margin: 2px 0; }
                             .receipt-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; font-size: 0.8rem; margin-bottom: 10px; }
                             .receipt-info .label { font-weight: 600; color: #6B7280; }
+                            .receipt-table { width: 100%; font-size: 0.75rem; border-collapse: collapse; margin: 8px 0; }
+                            .receipt-table th { text-align: left; padding: 0.3rem; border-bottom: 1px solid #e8eaed; color: #6B7280; }
+                            .receipt-table td { padding: 0.3rem; border-bottom: 1px solid #f0f2f5; }
+                            .receipt-table .text-right { text-align: right; }
+                            .receipt-table .text-center { text-align: center; }
                             .receipt-totals { border-top: 2px solid #e8eaed; margin-top: 10px; padding-top: 10px; }
                             .receipt-totals .total-row { display: flex; justify-content: space-between; padding: 0.2rem 0; font-size: 0.9rem; }
                             .receipt-totals .total-row.final { font-size: 1.2rem; font-weight: 700; color: #002B5C; border-top: 2px solid #002B5C; padding-top: 0.5rem; margin-top: 0.3rem; }
@@ -1199,12 +1257,10 @@
             }
             
             try {
-                showToast('⏳ Generating PDF...', 'info');
-                const url = API_URL + '/receipt/' + currentReceiptOrder;
-                window.open(url, '_blank');
-                showToast('✅ PDF download started', 'success');
+                showToast('📄 Generating receipt...', 'info');
+                showReceipt(currentReceiptOrder);
             } catch (error) {
-                showToast('❌ Error downloading PDF: ' + error.message, 'error');
+                showToast('❌ Error: ' + error.message, 'error');
             }
         }
 
