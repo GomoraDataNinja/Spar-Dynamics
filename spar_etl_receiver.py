@@ -301,6 +301,24 @@ def get_dynamic_cash_balance_proxy():
         return jsonify({"cash_balance": 0, "available_cash": 0}), 200
 
 # ============================================
+# BANK BALANCE (Legacy)
+# ============================================
+
+@app.route('/bank-balance', methods=['GET'])
+def get_bank_balance_proxy():
+    if not CLOUDFLARE_API_URL:
+        return jsonify({"total_balance": 0}), 200
+
+    try:
+        url = f"{CLOUDFLARE_API_URL}/bank-balance"
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        return jsonify({"total_balance": 0}), 200
+    except:
+        return jsonify({"total_balance": 0}), 200
+
+# ============================================
 # CUSTOMERS
 # ============================================
 
@@ -353,6 +371,78 @@ def get_receipt_proxy(order_number):
         return jsonify({"error": "Failed to generate receipt"}), response.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# ============================================
+# OVERDUE POS
+# ============================================
+
+@app.route('/overdue-pos', methods=['GET'])
+def get_overdue_pos_proxy():
+    if not CLOUDFLARE_API_URL:
+        return jsonify({"overdue_count": 0}), 200
+
+    try:
+        url = f"{CLOUDFLARE_API_URL}/overdue-pos"
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        return jsonify({"overdue_count": 0}), 200
+    except:
+        return jsonify({"overdue_count": 0}), 200
+
+# ============================================
+# INCOMING DOCUMENTS
+# ============================================
+
+@app.route('/incoming-documents', methods=['GET'])
+def get_incoming_documents_proxy():
+    if not CLOUDFLARE_API_URL:
+        return jsonify({"count": 0}), 200
+
+    try:
+        url = f"{CLOUDFLARE_API_URL}/incoming-documents"
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        return jsonify({"count": 0}), 200
+    except:
+        return jsonify({"count": 0}), 200
+
+# ============================================
+# PENDING APPROVALS
+# ============================================
+
+@app.route('/pending-approvals', methods=['GET'])
+def get_pending_approvals_proxy():
+    if not CLOUDFLARE_API_URL:
+        return jsonify({"pending_pos": 0, "pending_sos": 0}), 200
+
+    try:
+        url = f"{CLOUDFLARE_API_URL}/pending-approvals"
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        return jsonify({"pending_pos": 0, "pending_sos": 0}), 200
+    except:
+        return jsonify({"pending_pos": 0, "pending_sos": 0}), 200
+
+# ============================================
+# UNPROCESSED PAYMENTS
+# ============================================
+
+@app.route('/unprocessed-payments', methods=['GET'])
+def get_unprocessed_payments_proxy():
+    if not CLOUDFLARE_API_URL:
+        return jsonify({"count": 0}), 200
+
+    try:
+        url = f"{CLOUDFLARE_API_URL}/unprocessed-payments"
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        return jsonify({"count": 0}), 200
+    except:
+        return jsonify({"count": 0}), 200
 
 # ============================================
 # APPROVE/REJECT PO
@@ -427,9 +517,14 @@ def index():
             "goods_receipt": "POST /goods-receipt",
             "recent": "GET /recent",
             "bank-accounts": "GET /bank-accounts",
+            "bank-balance": "GET /bank-balance",
             "dynamic-cash-balance": "GET /dynamic-cash-balance",
             "customers": "GET /customers",
-            "receipt/<order_number>": "GET /receipt/<order_number>"
+            "receipt/<order_number>": "GET /receipt/<order_number>",
+            "overdue-pos": "GET /overdue-pos",
+            "incoming-documents": "GET /incoming-documents",
+            "pending-approvals": "GET /pending-approvals",
+            "unprocessed-payments": "GET /unprocessed-payments"
         }
     })
 
@@ -454,8 +549,13 @@ if __name__ == '__main__':
     print("   POST /goods-receipt")
     print("   GET  /recent")
     print("   GET  /bank-accounts")
+    print("   GET  /bank-balance")
     print("   GET  /dynamic-cash-balance")
     print("   GET  /customers")
     print("   GET  /receipt/<order_number>")
+    print("   GET  /overdue-pos")
+    print("   GET  /incoming-documents")
+    print("   GET  /pending-approvals")
+    print("   GET  /unprocessed-payments")
     print("=" * 70)
     app.run(host='0.0.0.0', port=port, debug=False)
