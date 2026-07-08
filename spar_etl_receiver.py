@@ -123,6 +123,27 @@ def get_products():
     return jsonify(result if result else []), 200
 
 # ============================================
+# PRODUCTS - ADD (Proxy)
+# ============================================
+
+@app.route('/products/add', methods=['POST'])
+def add_product_proxy():
+    if not CLOUDFLARE_API_URL:
+        return jsonify({"error": "Cloudflare not configured"}), 500
+
+    try:
+        url = f"{CLOUDFLARE_API_URL}/products/add"
+        response = requests.post(
+            url,
+            json=request.json,
+            timeout=60,
+            headers={"Content-Type": "application/json"}
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
 # SALES ORDERS
 # ============================================
 
@@ -508,6 +529,7 @@ def index():
         "endpoints": {
             "health": "GET /health",
             "products": "GET /products",
+            "products/add": "POST /products/add",
             "sales_orders": "GET /sales-orders, POST /sales-orders",
             "purchase_orders": "GET /purchase-orders, POST /purchase-orders",
             "purchase_orders/lines": "GET /purchase-orders/<po_number>/lines",
@@ -538,6 +560,7 @@ if __name__ == '__main__':
     print("\n📋 Available Endpoints:")
     print("   GET  /health")
     print("   GET  /products")
+    print("   POST /products/add")
     print("   GET  /sales-orders")
     print("   POST /sales-orders")
     print("   GET  /purchase-orders")
