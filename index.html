@@ -1201,61 +1201,158 @@
             }
         }
 
-        function printReceipt() {
-            const content = document.getElementById('receiptContent');
-            if (!content) return;
-            
-            const printWindow = window.open('', '_blank', 'width=800,height=600');
-            if (!printWindow) {
-                showToast('❌ Please allow popups to print', 'error');
+        // ============================================
+        // PRINT RECEIPT - FIXED (uses API data)
+        // ============================================
+        async function printReceipt() {
+            if (!currentReceiptOrder) {
+                showToast('❌ No receipt to print', 'error');
                 return;
             }
-            
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>SPAR Receipt - ${currentReceiptOrder || ''}</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; padding: 20px; max-width: 550px; margin: auto; background: white; }
-                            .receipt-container { padding: 20px; }
-                            .receipt-header { text-align: center; border-bottom: 2px solid #e8eaed; padding-bottom: 15px; margin-bottom: 15px; }
-                            .receipt-header h2 { color: #002B5C; font-size: 1.3rem; }
-                            .receipt-header p { font-size: 0.8rem; color: #6B7280; margin: 2px 0; }
-                            .receipt-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; font-size: 0.8rem; margin-bottom: 10px; }
-                            .receipt-info .label { font-weight: 600; color: #6B7280; }
-                            .receipt-table { width: 100%; font-size: 0.75rem; border-collapse: collapse; margin: 8px 0; }
-                            .receipt-table th { text-align: left; padding: 0.3rem; border-bottom: 1px solid #e8eaed; color: #6B7280; }
-                            .receipt-table td { padding: 0.3rem; border-bottom: 1px solid #f0f2f5; }
-                            .receipt-table .text-right { text-align: right; }
-                            .receipt-table .text-center { text-align: center; }
-                            .receipt-totals { border-top: 2px solid #e8eaed; margin-top: 10px; padding-top: 10px; }
-                            .receipt-totals .total-row { display: flex; justify-content: space-between; padding: 0.2rem 0; font-size: 0.9rem; }
-                            .receipt-totals .total-row.final { font-size: 1.2rem; font-weight: 700; color: #002B5C; border-top: 2px solid #002B5C; padding-top: 0.5rem; margin-top: 0.3rem; }
-                            .receipt-rewards { color: #28a745; font-weight: 600; margin: 10px 0; text-align: right; font-size: 0.9rem; }
-                            .receipt-footer { text-align: center; font-size: 0.7rem; color: #6B7280; border-top: 1px solid #e8eaed; padding-top: 10px; margin-top: 10px; }
-                            hr { border: none; border-top: 1px solid #e8eaed; margin: 10px 0; }
-                            .no-print { display: none; }
-                            @media print { .no-print { display: none; } }
-                        </style>
-                    </head>
-                    <body>
-                        ${content.innerHTML}
-                        <div style="text-align:center;margin-top:20px;" class="no-print">
-                            <button onclick="window.print()" style="padding:8px 20px;margin:5px;background:#002B5C;color:white;border:none;border-radius:4px;cursor:pointer;">Print</button>
-                            <button onclick="window.close()" style="padding:8px 20px;margin:5px;background:#6B7280;color:white;border:none;border-radius:4px;cursor:pointer;">Close</button>
+
+            try {
+                // Fetch the receipt data from the API
+                const response = await fetch(API_URL + '/receipt/' + currentReceiptOrder);
+                if (!response.ok) {
+                    showToast('❌ Failed to fetch receipt data', 'error');
+                    return;
+                }
+                const data = await response.json();
+                if (data.status !== 'success' || !data.receipt) {
+                    showToast('❌ Receipt data not found', 'error');
+                    return;
+                }
+
+                const receipt = data.receipt;
+                const rewardsEarned = receipt.rewards_earned || (receipt.total_amount * 0.02);
+
+                // Build the receipt HTML from the data
+                let itemsHTML = '';
+                if (receipt.lines && receipt.lines.length > 0) {
+                    itemsHTML = receipt.lines.map(item => `
+                        <tr>
+                            <td>${item.product_name}</td>
+                            <td class="text-center">${item.quantity}</td>
+                            <td class="text-right">${formatCurrency(item.unit_price)}</td>
+                            <td class="text-right">${formatCurrency(item.line_total)}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    itemsHTML = `
+                        <tr>
+                            <td colspan="4" style="text-align:center;color:#6B7280;padding:10px 0;">
+                                No items found
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                const printHTML = `
+                    <div class="receipt-container">
+                        <div class="receipt-header">
+                            <h2>SPAR Dynamics 365</h2>
+                            <p>Yellowcob Enterprises Pvt Ltd</p>
+                            <p style="font-size:0.7rem;">123 Main Street, Harare, Zimbabwe</p>
+                            <hr>
                         </div>
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
-            
-            setTimeout(() => {
-                printWindow.print();
-            }, 1000);
+                        <div class="receipt-info">
+                            <span class="label">Order #:</span>
+                            <span>${receipt.order_number}</span>
+                            <span class="label">Date:</span>
+                            <span>${receipt.order_date}</span>
+                            <span class="label">Time:</span>
+                            <span>${receipt.order_time}</span>
+                            <span class="label">Customer:</span>
+                            <span>${receipt.customer_name}</span>
+                        </div>
+                        <hr>
+                        <table class="receipt-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="text-center">Qty</th>
+                                    <th class="text-right">Price</th>
+                                    <th class="text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsHTML}
+                            </tbody>
+                        </table>
+                        <div class="receipt-totals">
+                            <div class="total-row final">
+                                <span>Total Amount:</span>
+                                <span style="font-weight:700;font-size:1.2rem;">${formatCurrency(receipt.total_amount)}</span>
+                            </div>
+                        </div>
+                        <div class="receipt-rewards">
+                            ⭐ Rewards Earned: ${rewardsEarned.toFixed(2)} pts
+                        </div>
+                        <div class="receipt-footer">
+                            <p>Thank you for shopping with SPAR!</p>
+                            <p style="font-size:0.6rem;">Generated on: ${new Date().toLocaleString()}</p>
+                        </div>
+                    </div>
+                `;
+
+                // Open print window
+                const printWindow = window.open('', '_blank', 'width=800,height=600');
+                if (!printWindow) {
+                    showToast('❌ Please allow popups to print', 'error');
+                    return;
+                }
+
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>SPAR Receipt - ${currentReceiptOrder}</title>
+                            <style>
+                                body { font-family: Arial, sans-serif; padding: 20px; max-width: 550px; margin: auto; background: white; }
+                                .receipt-container { padding: 20px; }
+                                .receipt-header { text-align: center; border-bottom: 2px solid #e8eaed; padding-bottom: 15px; margin-bottom: 15px; }
+                                .receipt-header h2 { color: #002B5C; font-size: 1.3rem; }
+                                .receipt-header p { font-size: 0.8rem; color: #6B7280; margin: 2px 0; }
+                                .receipt-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; font-size: 0.8rem; margin-bottom: 10px; }
+                                .receipt-info .label { font-weight: 600; color: #6B7280; }
+                                .receipt-table { width: 100%; font-size: 0.75rem; border-collapse: collapse; margin: 8px 0; }
+                                .receipt-table th { text-align: left; padding: 0.3rem; border-bottom: 1px solid #e8eaed; color: #6B7280; }
+                                .receipt-table td { padding: 0.3rem; border-bottom: 1px solid #f0f2f5; }
+                                .receipt-table .text-right { text-align: right; }
+                                .receipt-table .text-center { text-align: center; }
+                                .receipt-totals { border-top: 2px solid #e8eaed; margin-top: 10px; padding-top: 10px; }
+                                .receipt-totals .total-row { display: flex; justify-content: space-between; padding: 0.2rem 0; font-size: 0.9rem; }
+                                .receipt-totals .total-row.final { font-size: 1.2rem; font-weight: 700; color: #002B5C; border-top: 2px solid #002B5C; padding-top: 0.5rem; margin-top: 0.3rem; }
+                                .receipt-rewards { color: #28a745; font-weight: 600; margin: 10px 0; text-align: right; font-size: 0.9rem; }
+                                .receipt-footer { text-align: center; font-size: 0.7rem; color: #6B7280; border-top: 1px solid #e8eaed; padding-top: 10px; margin-top: 10px; }
+                                hr { border: none; border-top: 1px solid #e8eaed; margin: 10px 0; }
+                                .no-print { display: none; }
+                                @media print { .no-print { display: none; } }
+                            </style>
+                        </head>
+                        <body>
+                            ${printHTML}
+                            <div style="text-align:center;margin-top:20px;" class="no-print">
+                                <button onclick="window.print()" style="padding:8px 20px;margin:5px;background:#002B5C;color:white;border:none;border-radius:4px;cursor:pointer;">Print</button>
+                                <button onclick="window.close()" style="padding:8px 20px;margin:5px;background:#6B7280;color:white;border:none;border-radius:4px;cursor:pointer;">Close</button>
+                            </div>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+
+                // Automatically trigger print after a short delay (to allow rendering)
+                setTimeout(() => {
+                    printWindow.print();
+                }, 800);
+
+            } catch (error) {
+                showToast('❌ Error printing: ' + error.message, 'error');
+                debugLog('❌ Print error: ' + error.message, 'error');
+            }
         }
 
         // ============================================
-        // DOWNLOAD PDF - NEW IMPLEMENTATION
+        // DOWNLOAD PDF - using html2canvas + jsPDF
         // ============================================
         async function downloadReceipt() {
             if (!currentReceiptOrder) {
@@ -1263,7 +1360,6 @@
                 return;
             }
 
-            // Get the receipt container element
             const receiptElement = document.querySelector('#receiptContent .receipt-container');
             if (!receiptElement) {
                 showToast('❌ Receipt content not found', 'error');
@@ -1273,7 +1369,6 @@
             try {
                 showToast('⏳ Generating PDF...', 'info');
 
-                // Capture the receipt as a canvas
                 const canvas = await html2canvas(receiptElement, {
                     scale: 2,
                     useCORS: true,
@@ -1283,7 +1378,6 @@
 
                 const imgData = canvas.toDataURL('image/png');
 
-                // Create PDF (A4 portrait)
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF('p', 'mm', 'a4');
                 const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -1292,11 +1386,9 @@
                 let heightLeft = pdfHeight;
                 let position = 0;
 
-                // Add image to PDF
                 pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
                 heightLeft -= pdfHeight;
 
-                // If content overflows, add more pages (unlikely for a receipt)
                 while (heightLeft > 0) {
                     position = heightLeft - pdfHeight;
                     pdf.addPage();
@@ -1304,7 +1396,6 @@
                     heightLeft -= pdfHeight;
                 }
 
-                // Download PDF
                 pdf.save(`Receipt_${currentReceiptOrder}.pdf`);
                 showToast('✅ PDF downloaded successfully!', 'success');
             } catch (error) {
