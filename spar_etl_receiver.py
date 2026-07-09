@@ -1,13 +1,12 @@
 """
-SPAR ETL Receiver - Render Version
-Complete API with all features
+SPAR ETL Receiver - Render Version (COMPLETE)
+All endpoints proxied to local database via Cloudflare tunnel
 """
 
 from flask import Flask, request, jsonify, send_file
 from datetime import datetime
 import logging
 import os
-import random
 import requests
 import traceback
 from io import BytesIO
@@ -29,28 +28,47 @@ logger.info(f"🔗 Cloudflare API URL: {CLOUDFLARE_API_URL or 'NOT SET'}")
 # ============================================
 
 def execute_query_via_cloudflare(query, params=None):
+    """Execute a query on the local database via Cloudflare tunnel."""
     if not CLOUDFLARE_API_URL:
+        logger.error("❌ CLOUDFLARE_API_URL not configured")
         return []
 
     try:
         url = f"{CLOUDFLARE_API_URL}/execute-query"
+        logger.info(f"📡 Calling: {url}")
+        logger.info(f"📝 Query: {query[:100]}...")
+        
         response = requests.post(
             url,
             json={"query": query, "params": params or []},
-            timeout=30,
+            timeout=60,
             headers={"Content-Type": "application/json"}
         )
+        
+        logger.info(f"📥 Response status: {response.status_code}")
+        
         if response.status_code == 200:
-            return response.json()
+            result = response.json()
+            logger.info(f"✅ Query returned {len(result) if result else 0} rows")
+            return result if result else []
         else:
-            logger.error(f"Query error: {response.status_code}")
+            logger.error(f"❌ Query failed with status {response.status_code}: {response.text[:200]}")
             return []
+            
+    except requests.exceptions.Timeout:
+        logger.error("❌ Query timeout - tunnel may be slow")
+        return []
+    except requests.exceptions.ConnectionError:
+        logger.error("❌ Connection error - tunnel may be down")
+        return []
     except Exception as e:
-        logger.error(f"Query exception: {e}")
+        logger.error(f"❌ Query exception: {e}")
         return []
 
 def execute_command_via_cloudflare(query, params=None):
+    """Execute a command (INSERT/UPDATE/DELETE) via Cloudflare tunnel."""
     if not CLOUDFLARE_API_URL:
+        logger.error("❌ CLOUDFLARE_API_URL not configured")
         return {"success": False, "error": "CLOUDFLARE_API_URL not configured"}
 
     try:
@@ -58,15 +76,50 @@ def execute_command_via_cloudflare(query, params=None):
         response = requests.post(
             url,
             json={"query": query, "params": params or []},
-            timeout=30,
+            timeout=60,
             headers={"Content-Type": "application/json"}
         )
+        
         if response.status_code == 200:
             return response.json()
         else:
+            logger.error(f"❌ Command failed: {response.status_code} - {response.text[:200]}")
             return {"success": False, "error": f"Status {response.status_code}"}
+            
     except Exception as e:
+        logger.error(f"❌ Command exception: {e}")
         return {"success": False, "error": str(e)}
+
+def proxy_get_request(endpoint):
+    """Generic GET proxy."""
+    if not CLOUDFLARE_API_URL:
+        return jsonify({"error": "Cloudflare not configured"}), 500
+
+    try:
+        url = f"{CLOUDFLARE_API_URL}/{endpoint.lstrip('/')}"
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        return jsonify({"error": f"Failed: {response.status_code}"}), response.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def proxy_post_request(endpoint):
+    """Generic POST proxy."""
+    if not CLOUDFLARE_API_URL:
+        return jsonify({"error": "Cloudflare not configured"}), 500
+
+    try:
+        url = f"{CLOUDFLARE_API_URL}/{endpoint.lstrip('/')}"
+        response = requests.post(
+            url,
+            json=request.json,
+            timeout=60,
+            headers={"Content-Type": "application/json"}
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ============================================
 # HEALTH CHECK
@@ -75,6 +128,8 @@ def execute_command_via_cloudflare(query, params=None):
 @app.route('/health', methods=['GET'])
 def health():
     cloudflare_status = "unknown"
+    cloudflare_url = CLOUDFLARE_API_URL or "NOT SET"
+    
     if CLOUDFLARE_API_URL:
         try:
             response = requests.get(f"{CLOUDFLARE_API_URL}/health", timeout=10)
@@ -82,8 +137,12 @@ def health():
                 cloudflare_status = "connected"
             else:
                 cloudflare_status = f"error_{response.status_code}"
-        except:
-            cloudflare_status = "disconnected"
+        except requests.exceptions.Timeout:
+            cloudflare_status = "timeout"
+        except requests.exceptions.ConnectionError:
+            cloudflare_status = "connection_error"
+        except Exception as e:
+            cloudflare_status = f"error: {str(e)[:30]}"
 
     return jsonify({
         "status": "healthy" if cloudflare_status == "connected" else "degraded",
@@ -91,7 +150,79 @@ def health():
         "timestamp": datetime.now().isoformat(),
         "cloudflare_configured": bool(CLOUDFLARE_API_URL),
         "cloudflare_status": cloudflare_status,
-        "cloudflare_url": CLOUDFLARE_API_URL
+        "cloudflare_url": cloudflare_url
+    })
+
+# ============================================
+# TEST ENDPOINT
+# ============================================
+
+@app.route('/test', methods=['GET'])
+def test():
+    return jsonify({
+        "status": "ok",
+        "message": "Render server is running!",
+        "cloudflare_configured": bool(CLOUDFLARE_API_URL),
+        "cloudflare_url": CLOUDFLARE_API_URL or "NOT SET"
+    })
+
+# ============================================
+# DEBUG ENDPOINT
+# ============================================
+
+@app.route('/debug', methods=['GET'])
+def debug():
+    return jsonify({
+        "service": "SPAR ETL Receiver - Render",
+        "status": "running",
+        "cloudflare_configured": bool(CLOUDFLARE_API_URL),
+        "cloudflare_url": CLOUDFLARE_API_URL or "NOT SET",
+        "timestamp": datetime.now().isoformat(),
+        "endpoints_available": [
+            "/", "/health", "/test", "/debug",
+            "/products", "/sales-orders", "/purchase-orders",
+            "/recent", "/dynamic-cash-balance", "/customers",
+            "/bank-accounts", "/bank-balance",
+            "/overdue-pos", "/incoming-documents", 
+            "/pending-approvals", "/unprocessed-payments",
+            "/receipt/<order_number>"
+        ]
+    })
+
+# ============================================
+# ROOT
+# ============================================
+
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({
+        "service": "SPAR ETL Receiver - Render",
+        "status": "running",
+        "cloudflare_api": CLOUDFLARE_API_URL or "NOT SET",
+        "endpoints": {
+            "health": "GET /health",
+            "test": "GET /test",
+            "debug": "GET /debug",
+            "products": "GET /products",
+            "products/add": "POST /products/add",
+            "sales_orders": "GET /sales-orders, POST /sales-orders",
+            "purchase_orders": "GET /purchase-orders, POST /purchase-orders",
+            "purchase_orders/lines": "GET /purchase-orders/<po_number>/lines",
+            "purchase_orders/<po_number>/approve": "POST",
+            "purchase_orders/<po_number>/reject": "POST",
+            "purchase_orders/<po_number>": "DELETE",
+            "goods_receipt": "POST /goods-receipt",
+            "recent": "GET /recent",
+            "bank_accounts": "GET /bank-accounts",
+            "bank_balance": "GET /bank-balance",
+            "dynamic_cash_balance": "GET /dynamic-cash-balance",
+            "customers": "GET /customers",
+            "receipt/<order_number>": "GET /receipt/<order_number>",
+            "overdue_pos": "GET /overdue-pos",
+            "incoming_documents": "GET /incoming-documents",
+            "pending_approvals": "GET /pending-approvals",
+            "unprocessed_payments": "GET /unprocessed-payments"
+        }
     })
 
 # ============================================
@@ -101,7 +232,7 @@ def health():
 @app.route('/products', methods=['GET'])
 def get_products():
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured", "data": []}), 500
 
     query = """
         SELECT 
@@ -123,6 +254,10 @@ def get_products():
     result = execute_query_via_cloudflare(query)
     return jsonify(result if result else []), 200
 
+@app.route('/products/add', methods=['POST'])
+def add_product_proxy():
+    return proxy_post_request('products/add')
+
 # ============================================
 # SALES ORDERS
 # ============================================
@@ -130,7 +265,7 @@ def get_products():
 @app.route('/sales-orders', methods=['GET'])
 def get_sales_orders():
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     query = """
         SELECT 
@@ -150,6 +285,10 @@ def get_sales_orders():
     result = execute_query_via_cloudflare(query)
     return jsonify(result if result else []), 200
 
+@app.route('/sales-orders', methods=['POST'])
+def create_sales_order():
+    return proxy_post_request('sales-orders')
+
 # ============================================
 # RECENT SALES
 # ============================================
@@ -157,7 +296,7 @@ def get_sales_orders():
 @app.route('/recent', methods=['GET'])
 def get_recent_sales():
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     query = """
         SELECT TOP 50
@@ -185,7 +324,7 @@ def get_recent_sales():
 @app.route('/purchase-orders', methods=['GET'])
 def get_purchase_orders():
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     query = """
         SELECT 
@@ -199,6 +338,10 @@ def get_purchase_orders():
     result = execute_query_via_cloudflare(query)
     return jsonify(result if result else []), 200
 
+@app.route('/purchase-orders', methods=['POST'])
+def create_purchase_order():
+    return proxy_post_request('purchase-orders')
+
 # ============================================
 # PURCHASE ORDER LINES
 # ============================================
@@ -206,7 +349,7 @@ def get_purchase_orders():
 @app.route('/purchase-orders/<po_number>/lines', methods=['GET'])
 def get_purchase_order_lines(po_number):
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     query = """
         SELECT 
@@ -221,67 +364,12 @@ def get_purchase_order_lines(po_number):
     return jsonify(result if result else []), 200
 
 # ============================================
-# SALES ORDERS - POST
-# ============================================
-
-@app.route('/sales-orders', methods=['POST'])
-def create_sales_order():
-    if not CLOUDFLARE_API_URL:
-        return jsonify({"error": "Cloudflare not configured"}), 500
-
-    try:
-        url = f"{CLOUDFLARE_API_URL}/sales-orders"
-        response = requests.post(
-            url,
-            json=request.json,
-            timeout=60,
-            headers={"Content-Type": "application/json"}
-        )
-        return jsonify(response.json()), response.status_code
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# ============================================
-# PURCHASE ORDERS - POST
-# ============================================
-
-@app.route('/purchase-orders', methods=['POST'])
-def create_purchase_order():
-    if not CLOUDFLARE_API_URL:
-        return jsonify({"error": "Cloudflare not configured"}), 500
-
-    try:
-        url = f"{CLOUDFLARE_API_URL}/purchase-orders"
-        response = requests.post(
-            url,
-            json=request.json,
-            timeout=60,
-            headers={"Content-Type": "application/json"}
-        )
-        return jsonify(response.json()), response.status_code
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# ============================================
 # GOODS RECEIPT
 # ============================================
 
 @app.route('/goods-receipt', methods=['POST'])
 def receive_goods():
-    if not CLOUDFLARE_API_URL:
-        return jsonify({"error": "Cloudflare not configured"}), 500
-
-    try:
-        url = f"{CLOUDFLARE_API_URL}/goods-receipt"
-        response = requests.post(
-            url,
-            json=request.json,
-            timeout=60,
-            headers={"Content-Type": "application/json"}
-        )
-        return jsonify(response.json()), response.status_code
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return proxy_post_request('goods-receipt')
 
 # ============================================
 # DYNAMIC CASH BALANCE
@@ -289,35 +377,15 @@ def receive_goods():
 
 @app.route('/dynamic-cash-balance', methods=['GET'])
 def get_dynamic_cash_balance_proxy():
-    if not CLOUDFLARE_API_URL:
-        return jsonify({"cash_balance": 0, "available_cash": 0}), 200
-
-    try:
-        url = f"{CLOUDFLARE_API_URL}/dynamic-cash-balance"
-        response = requests.get(url, timeout=30)
-        if response.status_code == 200:
-            return jsonify(response.json()), 200
-        return jsonify({"cash_balance": 0, "available_cash": 0}), 200
-    except:
-        return jsonify({"cash_balance": 0, "available_cash": 0}), 200
+    return proxy_get_request('dynamic-cash-balance')
 
 # ============================================
-# CUSTOMERS
+# BANK BALANCE
 # ============================================
 
-@app.route('/customers', methods=['GET'])
-def get_customers_proxy():
-    if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
-
-    try:
-        url = f"{CLOUDFLARE_API_URL}/customers"
-        response = requests.get(url, timeout=30)
-        if response.status_code == 200:
-            return jsonify(response.json()), 200
-        return jsonify([]), 200
-    except:
-        return jsonify([]), 200
+@app.route('/bank-balance', methods=['GET'])
+def get_bank_balance_proxy():
+    return proxy_get_request('bank-balance')
 
 # ============================================
 # BANK ACCOUNTS
@@ -325,17 +393,47 @@ def get_customers_proxy():
 
 @app.route('/bank-accounts', methods=['GET'])
 def get_bank_accounts_proxy():
-    if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+    return proxy_get_request('bank-accounts')
 
-    try:
-        url = f"{CLOUDFLARE_API_URL}/bank-accounts"
-        response = requests.get(url, timeout=30)
-        if response.status_code == 200:
-            return jsonify(response.json()), 200
-        return jsonify([]), 200
-    except:
-        return jsonify([]), 200
+# ============================================
+# CUSTOMERS
+# ============================================
+
+@app.route('/customers', methods=['GET'])
+def get_customers_proxy():
+    return proxy_get_request('customers')
+
+# ============================================
+# OVERDUE POS
+# ============================================
+
+@app.route('/overdue-pos', methods=['GET'])
+def get_overdue_pos_proxy():
+    return proxy_get_request('overdue-pos')
+
+# ============================================
+# INCOMING DOCUMENTS
+# ============================================
+
+@app.route('/incoming-documents', methods=['GET'])
+def get_incoming_documents_proxy():
+    return proxy_get_request('incoming-documents')
+
+# ============================================
+# PENDING APPROVALS
+# ============================================
+
+@app.route('/pending-approvals', methods=['GET'])
+def get_pending_approvals_proxy():
+    return proxy_get_request('pending-approvals')
+
+# ============================================
+# UNPROCESSED PAYMENTS
+# ============================================
+
+@app.route('/unprocessed-payments', methods=['GET'])
+def get_unprocessed_payments_proxy():
+    return proxy_get_request('unprocessed-payments')
 
 # ============================================
 # RECEIPT
@@ -349,8 +447,10 @@ def get_receipt_proxy(order_number):
     try:
         url = f"{CLOUDFLARE_API_URL}/receipt/{order_number}"
         response = requests.get(url, timeout=60)
+        
         if response.status_code == 200:
-            if response.headers.get('content-type') == 'application/pdf':
+            # Check if response is PDF
+            if 'application/pdf' in response.headers.get('content-type', ''):
                 return send_file(
                     BytesIO(response.content),
                     as_attachment=True,
@@ -363,7 +463,7 @@ def get_receipt_proxy(order_number):
         return jsonify({"error": str(e)}), 500
 
 # ============================================
-# APPROVE/REJECT PO
+# APPROVE/REJECT/DELETE PO
 # ============================================
 
 @app.route('/purchase-orders/<po_number>/approve', methods=['POST'])
@@ -414,43 +514,22 @@ def after_request(response):
     return response
 
 # ============================================
-# ROOT
+# MAIN
 # ============================================
-
-@app.route('/', methods=['GET'])
-def index():
-    return jsonify({
-        "service": "SPAR ETL Receiver - Render",
-        "status": "running",
-        "cloudflare_api": CLOUDFLARE_API_URL or "NOT SET",
-        "endpoints": {
-            "health": "GET /health",
-            "products": "GET /products",
-            "sales_orders": "GET /sales-orders, POST /sales-orders",
-            "purchase_orders": "GET /purchase-orders, POST /purchase-orders",
-            "purchase_orders/lines": "GET /purchase-orders/<po_number>/lines",
-            "purchase_orders/<po_number>/approve": "POST",
-            "purchase_orders/<po_number>/reject": "POST",
-            "purchase_orders/<po_number>": "DELETE",
-            "goods_receipt": "POST /goods-receipt",
-            "recent": "GET /recent",
-            "bank-accounts": "GET /bank-accounts",
-            "dynamic-cash-balance": "GET /dynamic-cash-balance",
-            "customers": "GET /customers",
-            "receipt/<order_number>": "GET /receipt/<order_number>"
-        }
-    })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
     print("=" * 70)
-    print("🛒 SPAR ETL RECEIVER - Render Version")
+    print("🛒 SPAR ETL RECEIVER - Render Version (COMPLETE)")
     print("=" * 70)
     print(f"\n🚀 Starting server on port {port}...")
     print(f"🔗 Cloudflare API: {CLOUDFLARE_API_URL or 'NOT SET'}")
     print("\n📋 Available Endpoints:")
     print("   GET  /health")
+    print("   GET  /test")
+    print("   GET  /debug")
     print("   GET  /products")
+    print("   POST /products/add")
     print("   GET  /sales-orders")
     print("   POST /sales-orders")
     print("   GET  /purchase-orders")
@@ -462,8 +541,13 @@ if __name__ == '__main__':
     print("   POST /goods-receipt")
     print("   GET  /recent")
     print("   GET  /bank-accounts")
+    print("   GET  /bank-balance")
     print("   GET  /dynamic-cash-balance")
     print("   GET  /customers")
     print("   GET  /receipt/<order_number>")
+    print("   GET  /overdue-pos")
+    print("   GET  /incoming-documents")
+    print("   GET  /pending-approvals")
+    print("   GET  /unprocessed-payments")
     print("=" * 70)
     app.run(host='0.0.0.0', port=port, debug=False)
