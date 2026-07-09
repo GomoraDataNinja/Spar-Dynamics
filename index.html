@@ -10,10 +10,6 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- html2canvas + jsPDF for PDF download -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: #202124; height: 100vh; overflow: hidden; }
@@ -262,28 +258,6 @@
         .receipt-container .receipt-info .label {
             font-weight: 600;
             color: #6B7280;
-        }
-        .receipt-container .receipt-table {
-            width: 100%;
-            font-size: 0.75rem;
-            border-collapse: collapse;
-            margin: 8px 0;
-        }
-        .receipt-container .receipt-table th {
-            text-align: left;
-            padding: 0.3rem;
-            border-bottom: 1px solid #e8eaed;
-            color: #6B7280;
-        }
-        .receipt-container .receipt-table td {
-            padding: 0.3rem;
-            border-bottom: 1px solid #f0f2f5;
-        }
-        .receipt-container .receipt-table .text-right {
-            text-align: right;
-        }
-        .receipt-container .receipt-table .text-center {
-            text-align: center;
         }
         .receipt-container .receipt-totals {
             border-top: 2px solid #e8eaed;
@@ -558,7 +532,7 @@
                 <div class="log-entry info">📊 Showing sales from last 24 hours</div>
                 <div class="log-entry info">👑 Role-based access: Admin sees ALL, Operator sees only their sales</div>
                 <div class="log-entry info">⭐ Rewards System: Customers earn 2% on every purchase</div>
-                <div class="log-entry info">🧾 Receipt Generation: Download/print receipts</div>
+                <div class="log-entry info">🧾 PDF Receipt Generation: Download/print receipts</div>
             </div>
             
             <!-- Footer -->
@@ -827,7 +801,7 @@
             <div class="form-actions">
                 <button class="btn btn-secondary" onclick="closeModal('receiptModal')">Close</button>
                 <button class="btn btn-primary" onclick="printReceipt()">
-                    <i class="fas fa-print"></i> Print / PDF
+                    <i class="fas fa-print"></i> Print
                 </button>
                 <button class="btn btn-success" onclick="downloadReceipt()">
                     <i class="fas fa-file-pdf"></i> Download PDF
@@ -1118,26 +1092,6 @@
                         const receipt = data.receipt;
                         const rewardsEarned = receipt.rewards_earned || (receipt.total_amount * 0.02);
                         
-                        let itemsHTML = '';
-                        if (receipt.lines && receipt.lines.length > 0) {
-                            itemsHTML = receipt.lines.map(item => `
-                                <tr>
-                                    <td>${item.product_name}</td>
-                                    <td class="text-center">${item.quantity}</td>
-                                    <td class="text-right">${formatCurrency(item.unit_price)}</td>
-                                    <td class="text-right">${formatCurrency(item.line_total)}</td>
-                                </tr>
-                            `).join('');
-                        } else {
-                            itemsHTML = `
-                                <tr>
-                                    <td colspan="4" style="text-align:center;color:#6B7280;padding:10px 0;">
-                                        No items found
-                                    </td>
-                                </tr>
-                            `;
-                        }
-                        
                         let receiptHTML = `
                             <div class="receipt-container">
                                 <div class="receipt-header">
@@ -1157,23 +1111,13 @@
                                     <span>${receipt.customer_name}</span>
                                 </div>
                                 <hr>
-                                <table class="receipt-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Item</th>
-                                            <th class="text-center">Qty</th>
-                                            <th class="text-right">Price</th>
-                                            <th class="text-right">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${itemsHTML}
-                                    </tbody>
-                                </table>
+                                <div style="text-align:center;padding:10px 0;color:#6B7280;font-size:0.8rem;">
+                                    <i class="fas fa-receipt"></i> Receipt generated successfully
+                                </div>
                                 <div class="receipt-totals">
                                     <div class="total-row final">
                                         <span>Total Amount:</span>
-                                        <span style="font-weight:700;font-size:1.2rem;">${formatCurrency(receipt.total_amount)}</span>
+                                        <span style="font-weight:700;font-size:1.3rem;">${formatCurrency(receipt.total_amount)}</span>
                                     </div>
                                 </div>
                                 <div class="receipt-rewards">
@@ -1189,11 +1133,10 @@
                         document.getElementById('receiptContent').innerHTML = receiptHTML;
                         openModal('receiptModal');
                     } else {
-                        showToast('❌ Failed to load receipt: ' + (data.message || 'Unknown error'), 'error');
+                        showToast('❌ Failed to load receipt', 'error');
                     }
                 } else {
-                    const error = await response.json();
-                    showToast('❌ Failed to fetch receipt: ' + (error.error || 'Unknown error'), 'error');
+                    showToast('❌ Failed to fetch receipt', 'error');
                 }
             } catch (error) {
                 showToast('❌ Error: ' + error.message, 'error');
@@ -1201,206 +1144,67 @@
             }
         }
 
-        // ============================================
-        // PRINT RECEIPT - FIXED (uses API data)
-        // ============================================
-        async function printReceipt() {
-            if (!currentReceiptOrder) {
-                showToast('❌ No receipt to print', 'error');
+        function printReceipt() {
+            const content = document.getElementById('receiptContent');
+            if (!content) return;
+            
+            const printWindow = window.open('', '_blank', 'width=800,height=600');
+            if (!printWindow) {
+                showToast('❌ Please allow popups to print', 'error');
                 return;
             }
-
-            try {
-                // Fetch the receipt data from the API
-                const response = await fetch(API_URL + '/receipt/' + currentReceiptOrder);
-                if (!response.ok) {
-                    showToast('❌ Failed to fetch receipt data', 'error');
-                    return;
-                }
-                const data = await response.json();
-                if (data.status !== 'success' || !data.receipt) {
-                    showToast('❌ Receipt data not found', 'error');
-                    return;
-                }
-
-                const receipt = data.receipt;
-                const rewardsEarned = receipt.rewards_earned || (receipt.total_amount * 0.02);
-
-                // Build the receipt HTML from the data
-                let itemsHTML = '';
-                if (receipt.lines && receipt.lines.length > 0) {
-                    itemsHTML = receipt.lines.map(item => `
-                        <tr>
-                            <td>${item.product_name}</td>
-                            <td class="text-center">${item.quantity}</td>
-                            <td class="text-right">${formatCurrency(item.unit_price)}</td>
-                            <td class="text-right">${formatCurrency(item.line_total)}</td>
-                        </tr>
-                    `).join('');
-                } else {
-                    itemsHTML = `
-                        <tr>
-                            <td colspan="4" style="text-align:center;color:#6B7280;padding:10px 0;">
-                                No items found
-                            </td>
-                        </tr>
-                    `;
-                }
-
-                const printHTML = `
-                    <div class="receipt-container">
-                        <div class="receipt-header">
-                            <h2>SPAR Dynamics 365</h2>
-                            <p>Yellowcob Enterprises Pvt Ltd</p>
-                            <p style="font-size:0.7rem;">123 Main Street, Harare, Zimbabwe</p>
-                            <hr>
+            
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>SPAR Receipt - ${currentReceiptOrder || ''}</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; padding: 20px; max-width: 550px; margin: auto; background: white; }
+                            .receipt-container { padding: 20px; }
+                            .receipt-header { text-align: center; border-bottom: 2px solid #e8eaed; padding-bottom: 15px; margin-bottom: 15px; }
+                            .receipt-header h2 { color: #002B5C; font-size: 1.3rem; }
+                            .receipt-header p { font-size: 0.8rem; color: #6B7280; margin: 2px 0; }
+                            .receipt-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; font-size: 0.8rem; margin-bottom: 10px; }
+                            .receipt-info .label { font-weight: 600; color: #6B7280; }
+                            .receipt-totals { border-top: 2px solid #e8eaed; margin-top: 10px; padding-top: 10px; }
+                            .receipt-totals .total-row { display: flex; justify-content: space-between; padding: 0.2rem 0; font-size: 0.9rem; }
+                            .receipt-totals .total-row.final { font-size: 1.2rem; font-weight: 700; color: #002B5C; border-top: 2px solid #002B5C; padding-top: 0.5rem; margin-top: 0.3rem; }
+                            .receipt-rewards { color: #28a745; font-weight: 600; margin: 10px 0; text-align: right; font-size: 0.9rem; }
+                            .receipt-footer { text-align: center; font-size: 0.7rem; color: #6B7280; border-top: 1px solid #e8eaed; padding-top: 10px; margin-top: 10px; }
+                            hr { border: none; border-top: 1px solid #e8eaed; margin: 10px 0; }
+                            .no-print { display: none; }
+                            @media print { .no-print { display: none; } }
+                        </style>
+                    </head>
+                    <body>
+                        ${content.innerHTML}
+                        <div style="text-align:center;margin-top:20px;" class="no-print">
+                            <button onclick="window.print()" style="padding:8px 20px;margin:5px;background:#002B5C;color:white;border:none;border-radius:4px;cursor:pointer;">Print</button>
+                            <button onclick="window.close()" style="padding:8px 20px;margin:5px;background:#6B7280;color:white;border:none;border-radius:4px;cursor:pointer;">Close</button>
                         </div>
-                        <div class="receipt-info">
-                            <span class="label">Order #:</span>
-                            <span>${receipt.order_number}</span>
-                            <span class="label">Date:</span>
-                            <span>${receipt.order_date}</span>
-                            <span class="label">Time:</span>
-                            <span>${receipt.order_time}</span>
-                            <span class="label">Customer:</span>
-                            <span>${receipt.customer_name}</span>
-                        </div>
-                        <hr>
-                        <table class="receipt-table">
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th class="text-center">Qty</th>
-                                    <th class="text-right">Price</th>
-                                    <th class="text-right">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${itemsHTML}
-                            </tbody>
-                        </table>
-                        <div class="receipt-totals">
-                            <div class="total-row final">
-                                <span>Total Amount:</span>
-                                <span style="font-weight:700;font-size:1.2rem;">${formatCurrency(receipt.total_amount)}</span>
-                            </div>
-                        </div>
-                        <div class="receipt-rewards">
-                            ⭐ Rewards Earned: ${rewardsEarned.toFixed(2)} pts
-                        </div>
-                        <div class="receipt-footer">
-                            <p>Thank you for shopping with SPAR!</p>
-                            <p style="font-size:0.6rem;">Generated on: ${new Date().toLocaleString()}</p>
-                        </div>
-                    </div>
-                `;
-
-                // Open print window
-                const printWindow = window.open('', '_blank', 'width=800,height=600');
-                if (!printWindow) {
-                    showToast('❌ Please allow popups to print', 'error');
-                    return;
-                }
-
-                printWindow.document.write(`
-                    <html>
-                        <head>
-                            <title>SPAR Receipt - ${currentReceiptOrder}</title>
-                            <style>
-                                body { font-family: Arial, sans-serif; padding: 20px; max-width: 550px; margin: auto; background: white; }
-                                .receipt-container { padding: 20px; }
-                                .receipt-header { text-align: center; border-bottom: 2px solid #e8eaed; padding-bottom: 15px; margin-bottom: 15px; }
-                                .receipt-header h2 { color: #002B5C; font-size: 1.3rem; }
-                                .receipt-header p { font-size: 0.8rem; color: #6B7280; margin: 2px 0; }
-                                .receipt-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; font-size: 0.8rem; margin-bottom: 10px; }
-                                .receipt-info .label { font-weight: 600; color: #6B7280; }
-                                .receipt-table { width: 100%; font-size: 0.75rem; border-collapse: collapse; margin: 8px 0; }
-                                .receipt-table th { text-align: left; padding: 0.3rem; border-bottom: 1px solid #e8eaed; color: #6B7280; }
-                                .receipt-table td { padding: 0.3rem; border-bottom: 1px solid #f0f2f5; }
-                                .receipt-table .text-right { text-align: right; }
-                                .receipt-table .text-center { text-align: center; }
-                                .receipt-totals { border-top: 2px solid #e8eaed; margin-top: 10px; padding-top: 10px; }
-                                .receipt-totals .total-row { display: flex; justify-content: space-between; padding: 0.2rem 0; font-size: 0.9rem; }
-                                .receipt-totals .total-row.final { font-size: 1.2rem; font-weight: 700; color: #002B5C; border-top: 2px solid #002B5C; padding-top: 0.5rem; margin-top: 0.3rem; }
-                                .receipt-rewards { color: #28a745; font-weight: 600; margin: 10px 0; text-align: right; font-size: 0.9rem; }
-                                .receipt-footer { text-align: center; font-size: 0.7rem; color: #6B7280; border-top: 1px solid #e8eaed; padding-top: 10px; margin-top: 10px; }
-                                hr { border: none; border-top: 1px solid #e8eaed; margin: 10px 0; }
-                                .no-print { display: none; }
-                                @media print { .no-print { display: none; } }
-                            </style>
-                        </head>
-                        <body>
-                            ${printHTML}
-                            <div style="text-align:center;margin-top:20px;" class="no-print">
-                                <button onclick="window.print()" style="padding:8px 20px;margin:5px;background:#002B5C;color:white;border:none;border-radius:4px;cursor:pointer;">Print</button>
-                                <button onclick="window.close()" style="padding:8px 20px;margin:5px;background:#6B7280;color:white;border:none;border-radius:4px;cursor:pointer;">Close</button>
-                            </div>
-                        </body>
-                    </html>
-                `);
-                printWindow.document.close();
-
-                // Automatically trigger print after a short delay (to allow rendering)
-                setTimeout(() => {
-                    printWindow.print();
-                }, 800);
-
-            } catch (error) {
-                showToast('❌ Error printing: ' + error.message, 'error');
-                debugLog('❌ Print error: ' + error.message, 'error');
-            }
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+            
+            setTimeout(() => {
+                printWindow.print();
+            }, 1000);
         }
 
-        // ============================================
-        // DOWNLOAD PDF - using html2canvas + jsPDF
-        // ============================================
-        async function downloadReceipt() {
+        function downloadReceipt() {
             if (!currentReceiptOrder) {
                 showToast('❌ No receipt to download', 'error');
                 return;
             }
-
-            const receiptElement = document.querySelector('#receiptContent .receipt-container');
-            if (!receiptElement) {
-                showToast('❌ Receipt content not found', 'error');
-                return;
-            }
-
+            
             try {
                 showToast('⏳ Generating PDF...', 'info');
-
-                const canvas = await html2canvas(receiptElement, {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    backgroundColor: '#ffffff'
-                });
-
-                const imgData = canvas.toDataURL('image/png');
-
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-                let heightLeft = pdfHeight;
-                let position = 0;
-
-                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-                heightLeft -= pdfHeight;
-
-                while (heightLeft > 0) {
-                    position = heightLeft - pdfHeight;
-                    pdf.addPage();
-                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-                    heightLeft -= pdfHeight;
-                }
-
-                pdf.save(`Receipt_${currentReceiptOrder}.pdf`);
-                showToast('✅ PDF downloaded successfully!', 'success');
+                const url = API_URL + '/receipt/' + currentReceiptOrder;
+                window.open(url, '_blank');
+                showToast('✅ PDF download started', 'success');
             } catch (error) {
-                console.error('PDF generation error:', error);
-                showToast('❌ Failed to generate PDF: ' + error.message, 'error');
+                showToast('❌ Error downloading PDF: ' + error.message, 'error');
             }
         }
 
@@ -1889,8 +1693,6 @@
         // ============================================
         async function submitSalesOrder(event) {
             event.preventDefault();
-            console.log('🔵 submitSalesOrder called');
-            
             if (!currentUser) { 
                 showToast('❌ Please login first', 'error');
                 debugLog('❌ Attempted sale without login', 'error');
@@ -1918,8 +1720,6 @@
                 }
             });
 
-            console.log('📦 Items collected:', items);
-
             if (items.length === 0) { 
                 showToast('❌ Please add at least one item', 'error');
                 debugLog('❌ Sale submitted with no items', 'error');
@@ -1942,7 +1742,6 @@
                 recorded_by: currentUser.username
             };
 
-            console.log('📤 Sending sale data:', orderData);
             debugLog('📝 Submitting sale for user: ' + currentUser.username, 'info');
 
             try {
@@ -1954,11 +1753,8 @@
                     body: JSON.stringify(orderData)
                 });
 
-                console.log('📥 Response status:', response.status);
-
                 if (response.ok) {
                     const result = await response.json();
-                    console.log('✅ Sale created:', result);
                     debugLog('✅ Sale recorded by ' + currentUser.username + '! Order: ' + result.order_number + ', Total: ' + result.total_amount, 'success');
                     showToast('✅ Sale recorded! Order: ' + result.order_number + ' | Total: ' + formatCurrency(result.total_amount), 'success');
                     if (result.rewards_earned) {
@@ -2003,12 +1799,10 @@
                     return;
                 } else {
                     const error = await response.json();
-                    console.error('❌ Sale failed:', error);
                     debugLog('❌ Sale failed: ' + (error.error || 'Unknown error'), 'error');
                     showToast('❌ Error: ' + (error.error || 'Server error'), 'error');
                 }
             } catch (error) {
-                console.error('❌ Sale error:', error);
                 debugLog('❌ Sale error: ' + error.message, 'error');
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
             }
@@ -2094,13 +1888,8 @@
             if (totalEl) totalEl.textContent = formatCurrency(subtotal + tax);
         }
 
-        // ============================================
-        // SUBMIT PURCHASE ORDER - FIXED
-        // ============================================
         async function submitPurchaseOrder(event) {
             event.preventDefault();
-            console.log('🔵 submitPurchaseOrder called');
-            
             if (!currentUser) { 
                 showToast('❌ Please login first', 'error');
                 debugLog('❌ Attempted PO without login', 'error');
@@ -2128,8 +1917,6 @@
                 }
             });
 
-            console.log('📦 Items collected:', items);
-
             if (items.length === 0) { 
                 showToast('❌ Please add at least one item', 'error');
                 debugLog('❌ PO submitted with no items', 'error');
@@ -2153,7 +1940,6 @@
                 created_by: currentUser.username
             };
 
-            console.log('📤 Sending PO data:', poData);
             debugLog('📦 Submitting PO with ' + items.length + ' items', 'info');
 
             try {
@@ -2165,11 +1951,8 @@
                     body: JSON.stringify(poData)
                 });
 
-                console.log('📥 Response status:', response.status);
-                
                 if (response.ok) {
                     const result = await response.json();
-                    console.log('✅ PO created:', result);
                     debugLog('✅ PO created: ' + result.po_number + ' with ' + (result.lines_inserted || items.length) + ' items', 'success');
                     showToast('✅ Purchase Order ' + result.po_number + ' created!', 'success');
                     closeModal('poModal');
@@ -2179,12 +1962,10 @@
                     loadPage('purchase_orders');
                 } else {
                     const error = await response.json();
-                    console.error('❌ PO creation failed:', error);
                     debugLog('❌ PO creation failed: ' + (error.error || 'Unknown error'), 'error');
                     showToast('❌ Error: ' + (error.error || 'Server error'), 'error');
                 }
             } catch (error) {
-                console.error('❌ PO error:', error);
                 debugLog('❌ PO error: ' + error.message, 'error');
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
             }
