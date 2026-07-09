@@ -1,6 +1,6 @@
 """
-SPAR ETL Receiver - Render Version
-Complete API with all features
+SPAR ETL Receiver - Render Version (FIXED)
+Better error handling and debugging for Cloudflare tunnel
 """
 
 from flask import Flask, request, jsonify
@@ -24,47 +24,77 @@ CLOUDFLARE_API_URL = os.environ.get('CLOUDFLARE_API_URL', '').rstrip('/')
 logger.info(f"🔗 Cloudflare API URL: {CLOUDFLARE_API_URL or 'NOT SET'}")
 
 # ============================================
-# PROXY FUNCTIONS
+# PROXY FUNCTIONS (with better error handling)
 # ============================================
 
 def execute_query_via_cloudflare(query, params=None):
+    """
+    Execute a query on the local database via Cloudflare tunnel.
+    Returns the result as a list of dictionaries, or empty list on error.
+    """
     if not CLOUDFLARE_API_URL:
+        logger.error("❌ CLOUDFLARE_API_URL not configured")
         return []
 
     try:
         url = f"{CLOUDFLARE_API_URL}/execute-query"
+        logger.info(f"📡 Calling: {url}")
+        logger.info(f"📝 Query: {query[:100]}...")
+        
         response = requests.post(
             url,
             json={"query": query, "params": params or []},
-            timeout=30,
+            timeout=60,
             headers={"Content-Type": "application/json"}
         )
+        
+        logger.info(f"📥 Response status: {response.status_code}")
+        
         if response.status_code == 200:
-            return response.json()
+            result = response.json()
+            logger.info(f"✅ Query returned {len(result)} rows")
+            return result
         else:
-            logger.error(f"Query error: {response.status_code}")
+            logger.error(f"❌ Query failed with status {response.status_code}: {response.text[:200]}")
             return []
+            
+    except requests.exceptions.Timeout:
+        logger.error("❌ Query timeout - tunnel may be slow")
+        return []
+    except requests.exceptions.ConnectionError:
+        logger.error("❌ Connection error - tunnel may be down")
+        return []
     except Exception as e:
-        logger.error(f"Query exception: {e}")
+        logger.error(f"❌ Query exception: {e}")
         return []
 
 def execute_command_via_cloudflare(query, params=None):
+    """
+    Execute a command (INSERT/UPDATE/DELETE) on the local database via Cloudflare tunnel.
+    """
     if not CLOUDFLARE_API_URL:
+        logger.error("❌ CLOUDFLARE_API_URL not configured")
         return {"success": False, "error": "CLOUDFLARE_API_URL not configured"}
 
     try:
         url = f"{CLOUDFLARE_API_URL}/execute-command"
+        logger.info(f"📡 Calling: {url}")
+        
         response = requests.post(
             url,
             json={"query": query, "params": params or []},
-            timeout=30,
+            timeout=60,
             headers={"Content-Type": "application/json"}
         )
+        
         if response.status_code == 200:
             return response.json()
         else:
+            logger.error(f"❌ Command failed: {response.status_code} - {response.text[:200]}")
             return {"success": False, "error": f"Status {response.status_code}"}
+            
     except Exception as e:
+        logger.error(f"❌ Command exception: {e}")
         return {"success": False, "error": str(e)}
 
 # ============================================
@@ -74,6 +104,8 @@ def execute_command_via_cloudflare(query, params=None):
 @app.route('/health', methods=['GET'])
 def health():
     cloudflare_status = "unknown"
+    cloudflare_url = CLOUDFLARE_API_URL or "NOT SET"
+    
     if CLOUDFLARE_API_URL:
         try:
             response = requests.get(f"{CLOUDFLARE_API_URL}/health", timeout=10)
@@ -81,8 +113,12 @@ def health():
                 cloudflare_status = "connected"
             else:
                 cloudflare_status = f"error_{response.status_code}"
-        except:
-            cloudflare_status = "disconnected"
+        except requests.exceptions.Timeout:
+            cloudflare_status = "timeout"
+        except requests.exceptions.ConnectionError:
+            cloudflare_status = "connection_error"
+        except Exception as e:
+            cloudflare_status = f"error: {str(e)[:30]}"
 
     return jsonify({
         "status": "healthy" if cloudflare_status == "connected" else "degraded",
@@ -90,7 +126,20 @@ def health():
         "timestamp": datetime.now().isoformat(),
         "cloudflare_configured": bool(CLOUDFLARE_API_URL),
         "cloudflare_status": cloudflare_status,
-        "cloudflare_url": CLOUDFLARE_API_URL
+        "cloudflare_url": cloudflare_url
+    })
+
+# ============================================
+# TEST ENDPOINT
+# ============================================
+
+@app.route('/test', methods=['GET'])
+def test():
+    return jsonify({
+        "status": "ok",
+        "message": "Render server is running!",
+        "cloudflare_configured": bool(CLOUDFLARE_API_URL),
+        "cloudflare_url": CLOUDFLARE_API_URL or "NOT SET"
     })
 
 # ============================================
@@ -100,7 +149,8 @@ def health():
 @app.route('/products', methods=['GET'])
 def get_products():
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        logger.warning("⚠️ No Cloudflare URL configured")
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     query = """
         SELECT 
@@ -120,7 +170,9 @@ def get_products():
         ORDER BY pc.category_name, p.product_name
     """
     result = execute_query_via_cloudflare(query)
-    return jsonify(result if result else []), 200
+    if not result:
+        return jsonify([]), 200
+    return jsonify(result), 200
 
 # ============================================
 # PRODUCTS - ADD (Proxy)
@@ -528,6 +580,7 @@ def index():
         "cloudflare_api": CLOUDFLARE_API_URL or "NOT SET",
         "endpoints": {
             "health": "GET /health",
+            "test": "GET /test",
             "products": "GET /products",
             "products/add": "POST /products/add",
             "sales_orders": "GET /sales-orders, POST /sales-orders",
@@ -553,12 +606,13 @@ def index():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
     print("=" * 70)
-    print("🛒 SPAR ETL RECEIVER - Render Version")
+    print("🛒 SPAR ETL RECEIVER - Render Version (FIXED)")
     print("=" * 70)
     print(f"\n🚀 Starting server on port {port}...")
     print(f"🔗 Cloudflare API: {CLOUDFLARE_API_URL or 'NOT SET'}")
     print("\n📋 Available Endpoints:")
     print("   GET  /health")
+    print("   GET  /test")
     print("   GET  /products")
     print("   POST /products/add")
     print("   GET  /sales-orders")
