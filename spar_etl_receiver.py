@@ -7,7 +7,6 @@ from flask import Flask, request, jsonify
 from datetime import datetime
 import logging
 import os
-import random
 import requests
 import traceback
 
@@ -17,23 +16,25 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # ============================================
-# CONFIGURATION
+# CONFIGURATION - Read environment variable
 # ============================================
 
 CLOUDFLARE_API_URL = os.environ.get('CLOUDFLARE_API_URL', '').rstrip('/')
-logger.info(f"🔗 Cloudflare API URL: {CLOUDFLARE_API_URL or 'NOT SET'}")
+logger.info(f"🔗 Cloudflare API URL from env: '{CLOUDFLARE_API_URL or 'EMPTY'}'")
+logger.info(f"🔗 Is configured: {bool(CLOUDFLARE_API_URL)}")
+
+# If the URL is empty, log a warning
+if not CLOUDFLARE_API_URL:
+    logger.warning("⚠️ CLOUDFLARE_API_URL environment variable is NOT SET!")
 
 # ============================================
-# PROXY FUNCTIONS (with better error handling)
+# PROXY FUNCTIONS
 # ============================================
 
 def execute_query_via_cloudflare(query, params=None):
-    """
-    Execute a query on the local database via Cloudflare tunnel.
-    Returns the result as a list of dictionaries, or empty list on error.
-    """
+    """Execute a query on the local database via Cloudflare tunnel."""
     if not CLOUDFLARE_API_URL:
-        logger.error("❌ CLOUDFLARE_API_URL not configured")
+        logger.error("❌ CLOUDFLARE_API_URL not configured - cannot execute query")
         return []
 
     try:
@@ -52,8 +53,8 @@ def execute_query_via_cloudflare(query, params=None):
         
         if response.status_code == 200:
             result = response.json()
-            logger.info(f"✅ Query returned {len(result)} rows")
-            return result
+            logger.info(f"✅ Query returned {len(result) if result else 0} rows")
+            return result if result else []
         else:
             logger.error(f"❌ Query failed with status {response.status_code}: {response.text[:200]}")
             return []
@@ -69,17 +70,13 @@ def execute_query_via_cloudflare(query, params=None):
         return []
 
 def execute_command_via_cloudflare(query, params=None):
-    """
-    Execute a command (INSERT/UPDATE/DELETE) on the local database via Cloudflare tunnel.
-    """
+    """Execute a command (INSERT/UPDATE/DELETE) via Cloudflare tunnel."""
     if not CLOUDFLARE_API_URL:
         logger.error("❌ CLOUDFLARE_API_URL not configured")
         return {"success": False, "error": "CLOUDFLARE_API_URL not configured"}
 
     try:
         url = f"{CLOUDFLARE_API_URL}/execute-command"
-        logger.info(f"📡 Calling: {url}")
-        
         response = requests.post(
             url,
             json={"query": query, "params": params or []},
@@ -103,6 +100,7 @@ def execute_command_via_cloudflare(query, params=None):
 
 @app.route('/health', methods=['GET'])
 def health():
+    """Health check endpoint - shows Cloudflare connection status."""
     cloudflare_status = "unknown"
     cloudflare_url = CLOUDFLARE_API_URL or "NOT SET"
     
@@ -126,7 +124,9 @@ def health():
         "timestamp": datetime.now().isoformat(),
         "cloudflare_configured": bool(CLOUDFLARE_API_URL),
         "cloudflare_status": cloudflare_status,
-        "cloudflare_url": cloudflare_url
+        "cloudflare_url": cloudflare_url,
+        "env_var_exists": "CLOUDFLARE_API_URL" in os.environ,
+        "env_var_value": CLOUDFLARE_API_URL or "EMPTY"
     })
 
 # ============================================
@@ -135,11 +135,50 @@ def health():
 
 @app.route('/test', methods=['GET'])
 def test():
+    """Test endpoint - shows configuration status."""
     return jsonify({
         "status": "ok",
         "message": "Render server is running!",
         "cloudflare_configured": bool(CLOUDFLARE_API_URL),
-        "cloudflare_url": CLOUDFLARE_API_URL or "NOT SET"
+        "cloudflare_url": CLOUDFLARE_API_URL or "NOT SET",
+        "env_var_exists": "CLOUDFLARE_API_URL" in os.environ,
+        "env_var_value": CLOUDFLARE_API_URL or "EMPTY"
+    })
+
+# ============================================
+# ROOT
+# ============================================
+
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({
+        "service": "SPAR ETL Receiver - Render",
+        "status": "running",
+        "cloudflare_api": CLOUDFLARE_API_URL or "NOT SET",
+        "env_var_exists": "CLOUDFLARE_API_URL" in os.environ,
+        "endpoints": {
+            "health": "GET /health",
+            "test": "GET /test",
+            "products": "GET /products",
+            "products/add": "POST /products/add",
+            "sales_orders": "GET /sales-orders, POST /sales-orders",
+            "purchase_orders": "GET /purchase-orders, POST /purchase-orders",
+            "purchase_orders/lines": "GET /purchase-orders/<po_number>/lines",
+            "purchase_orders/<po_number>/approve": "POST",
+            "purchase_orders/<po_number>/reject": "POST",
+            "purchase_orders/<po_number>": "DELETE",
+            "goods_receipt": "POST /goods-receipt",
+            "recent": "GET /recent",
+            "bank-accounts": "GET /bank-accounts",
+            "bank-balance": "GET /bank-balance",
+            "dynamic-cash-balance": "GET /dynamic-cash-balance",
+            "customers": "GET /customers",
+            "receipt/<order_number>": "GET /receipt/<order_number>",
+            "overdue-pos": "GET /overdue-pos",
+            "incoming-documents": "GET /incoming-documents",
+            "pending-approvals": "GET /pending-approvals",
+            "unprocessed-payments": "GET /unprocessed-payments"
+        }
     })
 
 # ============================================
@@ -149,8 +188,8 @@ def test():
 @app.route('/products', methods=['GET'])
 def get_products():
     if not CLOUDFLARE_API_URL:
-        logger.warning("⚠️ No Cloudflare URL configured")
-        return jsonify({"error": "Cloudflare not configured"}), 500
+        logger.warning("⚠️ No Cloudflare URL configured - returning empty list")
+        return jsonify({"error": "Cloudflare not configured", "data": []}), 500
 
     query = """
         SELECT 
@@ -202,7 +241,7 @@ def add_product_proxy():
 @app.route('/sales-orders', methods=['GET'])
 def get_sales_orders():
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     query = """
         SELECT 
@@ -229,7 +268,7 @@ def get_sales_orders():
 @app.route('/recent', methods=['GET'])
 def get_recent_sales():
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     query = """
         SELECT TOP 50
@@ -257,7 +296,7 @@ def get_recent_sales():
 @app.route('/purchase-orders', methods=['GET'])
 def get_purchase_orders():
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     query = """
         SELECT 
@@ -278,7 +317,7 @@ def get_purchase_orders():
 @app.route('/purchase-orders/<po_number>/lines', methods=['GET'])
 def get_purchase_order_lines(po_number):
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     query = """
         SELECT 
@@ -398,7 +437,7 @@ def get_bank_balance_proxy():
 @app.route('/customers', methods=['GET'])
 def get_customers_proxy():
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     try:
         url = f"{CLOUDFLARE_API_URL}/customers"
@@ -416,7 +455,7 @@ def get_customers_proxy():
 @app.route('/bank-accounts', methods=['GET'])
 def get_bank_accounts_proxy():
     if not CLOUDFLARE_API_URL:
-        return jsonify([]), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     try:
         url = f"{CLOUDFLARE_API_URL}/bank-accounts"
@@ -452,7 +491,7 @@ def get_receipt_proxy(order_number):
 @app.route('/overdue-pos', methods=['GET'])
 def get_overdue_pos_proxy():
     if not CLOUDFLARE_API_URL:
-        return jsonify({"overdue_count": 0}), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     try:
         url = f"{CLOUDFLARE_API_URL}/overdue-pos"
@@ -470,7 +509,7 @@ def get_overdue_pos_proxy():
 @app.route('/incoming-documents', methods=['GET'])
 def get_incoming_documents_proxy():
     if not CLOUDFLARE_API_URL:
-        return jsonify({"count": 0}), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     try:
         url = f"{CLOUDFLARE_API_URL}/incoming-documents"
@@ -488,7 +527,7 @@ def get_incoming_documents_proxy():
 @app.route('/pending-approvals', methods=['GET'])
 def get_pending_approvals_proxy():
     if not CLOUDFLARE_API_URL:
-        return jsonify({"pending_pos": 0, "pending_sos": 0}), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     try:
         url = f"{CLOUDFLARE_API_URL}/pending-approvals"
@@ -506,7 +545,7 @@ def get_pending_approvals_proxy():
 @app.route('/unprocessed-payments', methods=['GET'])
 def get_unprocessed_payments_proxy():
     if not CLOUDFLARE_API_URL:
-        return jsonify({"count": 0}), 200
+        return jsonify({"error": "Cloudflare not configured"}), 500
 
     try:
         url = f"{CLOUDFLARE_API_URL}/unprocessed-payments"
@@ -569,39 +608,8 @@ def after_request(response):
     return response
 
 # ============================================
-# ROOT
+# MAIN
 # ============================================
-
-@app.route('/', methods=['GET'])
-def index():
-    return jsonify({
-        "service": "SPAR ETL Receiver - Render",
-        "status": "running",
-        "cloudflare_api": CLOUDFLARE_API_URL or "NOT SET",
-        "endpoints": {
-            "health": "GET /health",
-            "test": "GET /test",
-            "products": "GET /products",
-            "products/add": "POST /products/add",
-            "sales_orders": "GET /sales-orders, POST /sales-orders",
-            "purchase_orders": "GET /purchase-orders, POST /purchase-orders",
-            "purchase_orders/lines": "GET /purchase-orders/<po_number>/lines",
-            "purchase_orders/<po_number>/approve": "POST",
-            "purchase_orders/<po_number>/reject": "POST",
-            "purchase_orders/<po_number>": "DELETE",
-            "goods_receipt": "POST /goods-receipt",
-            "recent": "GET /recent",
-            "bank-accounts": "GET /bank-accounts",
-            "bank-balance": "GET /bank-balance",
-            "dynamic-cash-balance": "GET /dynamic-cash-balance",
-            "customers": "GET /customers",
-            "receipt/<order_number>": "GET /receipt/<order_number>",
-            "overdue-pos": "GET /overdue-pos",
-            "incoming-documents": "GET /incoming-documents",
-            "pending-approvals": "GET /pending-approvals",
-            "unprocessed-payments": "GET /unprocessed-payments"
-        }
-    })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
@@ -609,7 +617,11 @@ if __name__ == '__main__':
     print("🛒 SPAR ETL RECEIVER - Render Version (FIXED)")
     print("=" * 70)
     print(f"\n🚀 Starting server on port {port}...")
-    print(f"🔗 Cloudflare API: {CLOUDFLARE_API_URL or 'NOT SET'}")
+    print(f"🔗 Cloudflare API from env: '{CLOUDFLARE_API_URL or 'EMPTY'}'")
+    print(f"🔗 Is configured: {bool(CLOUDFLARE_API_URL)}")
+    if not CLOUDFLARE_API_URL:
+        print("⚠️  WARNING: CLOUDFLARE_API_URL is NOT SET!")
+        print("   Please add this environment variable in Render Dashboard.")
     print("\n📋 Available Endpoints:")
     print("   GET  /health")
     print("   GET  /test")
