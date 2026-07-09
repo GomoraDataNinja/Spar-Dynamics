@@ -292,7 +292,7 @@
         }
         .receipt-container .receipt-totals .total-row {
             display: flex;
-                        justify-content: space-between;
+            justify-content: space-between;
             padding: 0.2rem 0;
             font-size: 0.9rem;
         }
@@ -1889,6 +1889,8 @@
         // ============================================
         async function submitSalesOrder(event) {
             event.preventDefault();
+            console.log('🔵 submitSalesOrder called');
+            
             if (!currentUser) { 
                 showToast('❌ Please login first', 'error');
                 debugLog('❌ Attempted sale without login', 'error');
@@ -1916,6 +1918,8 @@
                 }
             });
 
+            console.log('📦 Items collected:', items);
+
             if (items.length === 0) { 
                 showToast('❌ Please add at least one item', 'error');
                 debugLog('❌ Sale submitted with no items', 'error');
@@ -1938,6 +1942,7 @@
                 recorded_by: currentUser.username
             };
 
+            console.log('📤 Sending sale data:', orderData);
             debugLog('📝 Submitting sale for user: ' + currentUser.username, 'info');
 
             try {
@@ -1949,8 +1954,11 @@
                     body: JSON.stringify(orderData)
                 });
 
+                console.log('📥 Response status:', response.status);
+
                 if (response.ok) {
                     const result = await response.json();
+                    console.log('✅ Sale created:', result);
                     debugLog('✅ Sale recorded by ' + currentUser.username + '! Order: ' + result.order_number + ', Total: ' + result.total_amount, 'success');
                     showToast('✅ Sale recorded! Order: ' + result.order_number + ' | Total: ' + formatCurrency(result.total_amount), 'success');
                     if (result.rewards_earned) {
@@ -1995,10 +2003,12 @@
                     return;
                 } else {
                     const error = await response.json();
+                    console.error('❌ Sale failed:', error);
                     debugLog('❌ Sale failed: ' + (error.error || 'Unknown error'), 'error');
                     showToast('❌ Error: ' + (error.error || 'Server error'), 'error');
                 }
             } catch (error) {
+                console.error('❌ Sale error:', error);
                 debugLog('❌ Sale error: ' + error.message, 'error');
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
             }
@@ -2084,8 +2094,13 @@
             if (totalEl) totalEl.textContent = formatCurrency(subtotal + tax);
         }
 
+        // ============================================
+        // SUBMIT PURCHASE ORDER - FIXED
+        // ============================================
         async function submitPurchaseOrder(event) {
             event.preventDefault();
+            console.log('🔵 submitPurchaseOrder called');
+            
             if (!currentUser) { 
                 showToast('❌ Please login first', 'error');
                 debugLog('❌ Attempted PO without login', 'error');
@@ -2113,6 +2128,8 @@
                 }
             });
 
+            console.log('📦 Items collected:', items);
+
             if (items.length === 0) { 
                 showToast('❌ Please add at least one item', 'error');
                 debugLog('❌ PO submitted with no items', 'error');
@@ -2136,6 +2153,7 @@
                 created_by: currentUser.username
             };
 
+            console.log('📤 Sending PO data:', poData);
             debugLog('📦 Submitting PO with ' + items.length + ' items', 'info');
 
             try {
@@ -2147,8 +2165,11 @@
                     body: JSON.stringify(poData)
                 });
 
+                console.log('📥 Response status:', response.status);
+                
                 if (response.ok) {
                     const result = await response.json();
+                    console.log('✅ PO created:', result);
                     debugLog('✅ PO created: ' + result.po_number + ' with ' + (result.lines_inserted || items.length) + ' items', 'success');
                     showToast('✅ Purchase Order ' + result.po_number + ' created!', 'success');
                     closeModal('poModal');
@@ -2158,10 +2179,12 @@
                     loadPage('purchase_orders');
                 } else {
                     const error = await response.json();
+                    console.error('❌ PO creation failed:', error);
                     debugLog('❌ PO creation failed: ' + (error.error || 'Unknown error'), 'error');
                     showToast('❌ Error: ' + (error.error || 'Server error'), 'error');
                 }
             } catch (error) {
+                console.error('❌ PO error:', error);
                 debugLog('❌ PO error: ' + error.message, 'error');
                 showToast('❌ Cannot connect to server. Please check your connection.', 'error');
             }
